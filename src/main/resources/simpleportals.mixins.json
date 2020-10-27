@@ -1,0 +1,18 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.zarathul.simpleportals.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "mixins": [
+    "EntityAccessor",
+    "ServerPlayerAccessor",
+    "DirectionAccessor"
+  ],
+  "client": [
+  ],
+  "server": [
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

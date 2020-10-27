@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " R ",
+    "RFR",
+    " R "
+  ],
+  "key": {
+    "R": {
+      "tag": "c:redstone_dusts"
+    },
+    "F": {
+      "item": "simpleportals:portal_frame"
+    }
+  },
+  "result": {
+    "item": "simpleportals:power_gauge",
+    "count": 1
+  }
+}

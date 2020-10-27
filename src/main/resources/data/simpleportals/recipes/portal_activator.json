@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "E E",
+    " I ",
+    " G "
+  ],
+  "key": {
+    "E": {
+      "tag": "c:emeralds"
+    },
+    "I": {
+      "item": "minecraft:ender_eye"
+    },
+    "G": {
+      "tag": "c:gold_ingots"
+    }
+  },
+  "result": {
+    "item": "simpleportals:portal_activator",
+    "count": 1
+  }
+}

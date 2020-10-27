@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "simpleportals",
+  "version": "${version}",
+
+  "name": "Simple Portals",
+  "description": "Adds portals for easy intra- and interdimensional travel.",
+  "authors": [
+    "Zarathul"
+  ],
+  "contact": {
+    "homepage": "https://github.com/Zarathul/simpleportals",
+    "sources": "https://github.com/Zarathul/simpleportals"
+  },
+
+  "license": "MIT",
+  "icon": "assets/simpleportals/logo.png",
+
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "net.zarathul.simpleportals.SimplePortals"
+    ],
+    "client": [
+      "net.zarathul.simpleportals.ClienInit"
+    ]
+  },
+  "mixins": [
+    "simpleportals.mixins.json"
+  ],
+
+  "depends": {
+    "fabricloader": ">=0.7.4",
+    "fabric": "*",
+    "minecraft": "1.16.x"
+  }
+}
