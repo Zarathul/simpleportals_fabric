@@ -220,7 +220,7 @@ public class BlockPortal extends Block
 					}
 					else
 					{
-						Utils.teleportTo(entity, destinationPortal.getDimension(), destinationPos, entityFacing);
+						entity = Utils.teleportTo(entity, destinationPortal.getDimension(), destinationPos, entityFacing);
 					}
 
 					PortalRegistry.updatePowerGauges((ServerLevel)world, start);
@@ -228,7 +228,6 @@ public class BlockPortal extends Block
 			}
 
 			// Put the entity on "cooldown" in order to prevent it from instantly porting again.
-			// TODO: fix this for non player entities, those get copied so the reference used here is the old one
 			((EntityAccessor)entity).setPortalCooldown(cooldown);
 		}
 	}

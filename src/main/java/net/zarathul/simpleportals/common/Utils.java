@@ -152,10 +152,14 @@ public final class Utils
 	 * The position to port to.
 	 * @param facing
 	 * The direction the entity should face after porting.
+	 * @return
+	 * The entity after the teleportation process. For non-player entities, if the teleportation was successful,
+	 * this will be a different entity than the one passed in. This is the case, because the entity needs to be
+	 * recreated in the destination dimension.
 	 */
-	public static void teleportTo(Entity entity, ResourceKey<Level> dimension, BlockPos destination, Direction facing)
+	public static Entity teleportTo(Entity entity, ResourceKey<Level> dimension, BlockPos destination, Direction facing)
 	{
-		if (entity == null || dimension == null || destination == null || !entity.canChangeDimensions() || entity.isVehicle() || entity.isPassenger()) return;
+		if (entity == null || dimension == null || destination == null || !entity.canChangeDimensions() || entity.isVehicle() || entity.isPassenger()) return entity;
 
 		ServerPlayer player = (entity instanceof ServerPlayer) ? (ServerPlayer) entity : null;
 		boolean interdimensional = (entity.getCommandSenderWorld().dimension() != dimension);
@@ -183,7 +187,7 @@ public final class Utils
 		{
 			if (interdimensional)
 			{
-				teleportNonPlayerEntityToDimension(entity, dimension, destination, getYaw(facing));
+				return teleportNonPlayerEntityToDimension(entity, dimension, destination, getYaw(facing));
 			}
 			else
 			{
@@ -194,6 +198,8 @@ public final class Utils
 							  0.0f);
 			}
 		}
+
+		return entity;
 	}
 
 	private static void teleportPlayerToDimension(ServerPlayer player, ResourceKey<Level> dimensionKey, BlockPos destination, float yaw, float pitch)
@@ -257,16 +263,19 @@ public final class Utils
 	 * The position to port to.
 	 * @param yaw
 	 * The rotation yaw the entity should have after porting.
+	 * @return
+	 * The entity after the teleportation process. If the teleportation was successful, this will be a different entity
+	 * than the one passed in. This is the case, because the entity needs to be recreated in the destination dimension.
 	 */
-	private static void teleportNonPlayerEntityToDimension(Entity entity, ResourceKey<Level> dimensionKey, BlockPos destination, float yaw)
+	private static Entity teleportNonPlayerEntityToDimension(Entity entity, ResourceKey<Level> dimensionKey, BlockPos destination, float yaw)
 	{
 		if (entity.level instanceof ServerLevel && !entity.removed)
 		{
 			MinecraftServer server = entity.getServer();
-			if (server == null)	return;
+			if (server == null)	return entity;
 
 			ServerLevel destinationWorld = server.getLevel(dimensionKey);
-			if (destinationWorld == null) return;
+			if (destinationWorld == null) return entity;
 
 			ServerLevel originWorld = (ServerLevel)entity.level;
 
@@ -287,7 +296,11 @@ public final class Utils
 
 			originWorld.resetEmptyTime();
 			destinationWorld.resetEmptyTime();
+
+			return (newEntity != null) ? newEntity : entity;
 		}
+
+		return entity;
 	}
 
 	/**
