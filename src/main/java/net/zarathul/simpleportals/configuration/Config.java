@@ -34,8 +34,8 @@ import java.util.Optional;
  * 4) For Complex types there must be two additional public static methods. One takes a string as a parameter
  *    and returns a value of the same type as the setting field. It has to have to same name as the field with
  *    'Load' appended (eg. 'mySetting' and 'mySettingLoad').
- *    The other one take one parameter of the same type as the setting field and returns a string. It has to
- *    have to same name as the field with 'Save' appended (eg. 'mySetting' and 'mySettingSave').
+ *    The other one takes one parameter of the same type as the setting field and returns a string. It has to
+ *    have to same name as the setting field with 'Save' appended (eg. 'mySetting' and 'mySettingSave').
  *    (Note: This was originally done using member function names of the setting field type stored in the
  *    ConfigSetting annotation. Unfortunately this only works in a Dev environment. In release all minecraft
  *    types have their original meaningless names restored and the reflection API can't find them anymore).
@@ -148,7 +148,7 @@ public final class Config
 	}
 
 	/**
-	 * Assumes a the passed field was already successfully validated.
+	 * Assumes the passed field was already successfully validated.
 	 */
 	public static Object getDefaultValue(Field field)
 	{
@@ -169,7 +169,7 @@ public final class Config
 	}
 
 	/**
-	 * Assumes a the passed field was already successfully validated.
+	 * Assumes the passed field was already successfully validated.
 	 */
 	public static Method getValidator(Field field)
 	{
@@ -269,7 +269,7 @@ public final class Config
 	}
 
 	/**
-	 * Assumes a the passed field was already successfully validated.
+	 * Assumes the passed field was already successfully validated.
 	 */
 	private static void appendPrimitiveTypeValue(Field field, ConfigSetting annotation, StringBuilder builder)
 	{
@@ -303,7 +303,7 @@ public final class Config
 	}
 
 	/**
-	 * Assumes a the passed field was already successfully validated.
+	 * Assumes the passed field was already successfully validated.
 	 */
 	private static void appendComplexTypeValue(Field field, ConfigSetting annotation, StringBuilder builder)
 	{
@@ -342,7 +342,7 @@ public final class Config
 	}
 
 	/**
-	 * Assumes a the passed field was already successfully validated.
+	 * Assumes the passed field was already successfully validated.
 	 */
 	private static void setToDefault(Field field)
 	{

@@ -205,7 +205,7 @@ public final class Utils
 	private static void teleportPlayerToDimension(ServerPlayer player, ResourceKey<Level> dimensionKey, BlockPos destination, float yaw, float pitch)
 	{
 		// Setting this flag circumvents at least a part of the shitty speed hack checks in
-		// net.minecraft.network.play.ServerPlayNetHandler#processPlayer() that cause nothing but trouble.
+		// 'ServerGamePacketListenerImpl.handleMovePlayer()' that cause nothing but trouble.
 		((ServerPlayerAccessor)player).setIsChangingDimension(true);
 
 		MinecraftServer server = player.getServer();

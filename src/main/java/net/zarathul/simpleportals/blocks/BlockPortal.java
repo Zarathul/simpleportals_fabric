@@ -199,9 +199,9 @@ public class BlockPortal extends Block
 						// Player teleportations are queued to avoid at least some of the problems that arise from
 						// handling player teleportation inside an entity collision handler. There seem to be all
 						// kinds of weird race conditions of movement packets that trigger the dreaded "moved wrongly"
-						// and "moved to quickly" checks in ServerPlayNetHandler.processPlayer(). No idea why end portals
-						// don't have these problems, considering that I use the same copy and pasted code minus the
-						// platform generation stuff.
+						// and "moved to quickly" checks in 'ServerGamePacketListenerImpl.handleMovePlayer()'. No idea
+						// why end portals don't have these problems, considering that I use the same copy and pasted
+						// code minus the platform generation stuff.
 						try
 						{
 							SimplePortals.TELEPORT_QUEUE.put(new TeleportTask(
