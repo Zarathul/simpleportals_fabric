@@ -3,7 +3,7 @@
 
 **Always provide**
 - Mod version
-- Farbic versions
+- Fabric versions
 - Description of what is happening
 
 **Depending on the issue**

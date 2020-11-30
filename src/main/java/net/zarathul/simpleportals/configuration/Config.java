@@ -411,12 +411,18 @@ public final class Config
 		// Set uninitialized setting fields to their default values, in case not all of them were loaded from file.
 
 		Field[] fields = clazz.getFields();
+		boolean settingsMissingInFile = false;
 
 		for (Field field : fields)
 		{
 			if (loadedSettings.contains(field) || !isValidSetting(field)) continue;
 			setToDefault(field);
+			settingsMissingInFile = true;
 		}
+
+		// Rewrite the config file if there were settings missing during loading.
+		// One possible reason for this happening is an old config file.
+		if (settingsMissingInFile) createConfig(file, clazz, false);
 	}
 
 	private static boolean loadPrimitiveValue(Field field, String valueString)

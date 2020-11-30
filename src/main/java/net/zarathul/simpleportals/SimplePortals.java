@@ -170,7 +170,7 @@ public class SimplePortals implements ModInitializer
 			Block hitBlock = blockState.getBlock();
 			Item usedItem = player.getItemInHand(hand).getItem();
 
-			if ((usedItem == itemPortalActivator) && ((hitBlock == blockPortalFrame)) || (hitBlock == blockPowerGauge))
+			if ((usedItem == itemPortalActivator) && ((hitBlock == blockPortalFrame) || (hitBlock == blockPowerGauge)))
 			{
 				InteractionResult result = blockState.use(world, player, hand, hit);
 				return result;
