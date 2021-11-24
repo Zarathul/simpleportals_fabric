@@ -10,7 +10,9 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.ImageButton;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextComponent;
@@ -46,39 +48,36 @@ public class ConfigGui extends Screen
 	}
 
 	@Override
-	public void init(Minecraft mc, int width, int height)
+	protected void init()
 	{
-		super.init(mc, width, height);
-
-		int titleHeight = mc.font.wordWrapHeight(title.getString(), width - 2 * PADDING);
+		int titleHeight = minecraft.font.wordWrapHeight(title.getString(), width - 2 * PADDING);
 		int paddedTitleHeight = titleHeight + PADDING * 2;
-
-		addButton(width - 120 - 2 * PADDING, 0, 60, paddedTitleHeight, "Back", button -> mc.setScreen(parent));
-		addButton(width - 60 - PADDING, 0, 60, paddedTitleHeight, "Save", button -> {
-			this.optionList.commitChanges();
-			Config.save(this.configName, this.settingsType);
-			mc.setScreen(parent);
-		});
 
 		int optionListHeaderHeight = titleHeight + 2 * PADDING;
 		this.optionList = new ModOptionList(this.settingsType, minecraft, width, height, optionListHeaderHeight, height - optionListHeaderHeight, 26);
-		this.children.add(optionList);
+		addRenderableWidget(optionList);
+
+		addButton(width - 120 - 2 * PADDING, 0, 60, paddedTitleHeight, "Back", button -> minecraft.setScreen(parent));
+		addButton(width - 60 - PADDING, 0, 60, paddedTitleHeight, "Save", button -> {
+			this.optionList.commitChanges();
+			Config.save(this.configName, this.settingsType);
+			minecraft.setScreen(parent);
+		});
 	}
 
 	private void addButton(int x, int y, int width, int height, String label, Button.OnPress pressHandler)
 	{
 		Button button = new Button(x, y, width, height, new TextComponent(label), pressHandler);
-
-		children.add(button);
-		buttons.add(button);
+		addRenderableWidget(button);
 	}
 
 	@Override
 	public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTicks)
 	{
 		this.renderBackground(poseStack);
-		if (this.optionList != null) this.optionList.render(poseStack, mouseX, mouseY, partialTicks);
-		RenderSystem.disableLighting();	// Rendering the tooltip enables lighting but buttons etc. assume lighting to be disabled.
+		RenderSystem.setShader(GameRenderer::getPositionTexShader);
+		// FIXME: obsolete?
+		// RenderSystem.disableLighting();	// Rendering the tooltip enables lighting but buttons etc. assume lighting to be disabled.
 		super.render(poseStack, mouseX, mouseY, partialTicks);
 		minecraft.font.draw(poseStack, title.getVisualOrderText(), PADDING, PADDING, 16777215);
 	}
@@ -202,6 +201,11 @@ public class ConfigGui extends Screen
 			}
 		}
 
+		@Override
+		public void updateNarration(NarrationElementOutput narrationElementOutput)
+		{
+		}
+
 		@Environment(EnvType.CLIENT)
 		public abstract class Entry extends AbstractSelectionList.Entry<ConfigGui.ModOptionList.Entry>
 		{
@@ -309,20 +313,20 @@ public class ConfigGui extends Screen
 				}
 				catch (IllegalAccessException e) {}
 
-				children.add(this.validatedButton);
-				children.add(this.needsWorldRestartButton);
+				addRenderableWidget(this.validatedButton);
+				addRenderableWidget(this.needsWorldRestartButton);
 
 				if (value instanceof Boolean)
 				{
 					this.checkBox = new CheckboxButtonEx(0, 0, 20, 20, TextComponent.EMPTY, (boolean)value);
 
-					children.add(this.checkBox);
+					addRenderableWidget(this.checkBox);
 				}
 				else if (value instanceof Enum)
 				{
 					this.enumButton = new EnumOptionButton(value.getClass(), value.toString(), 0, 0, 100, itemHeight - PADDING);
 
-					children.add(this.enumButton);
+					addRenderableWidget(this.enumButton);
 				}
 				else
 				{
@@ -333,7 +337,7 @@ public class ConfigGui extends Screen
 					this.editBox.setCanLoseFocus(true);
 					this.editBox.setFilter(this::validateTextFieldInput);
 
-					children.add(this.editBox);
+					addRenderableWidget(this.editBox);
 				}
 
 				this.tooltipText = null;

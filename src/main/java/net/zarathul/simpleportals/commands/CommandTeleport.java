@@ -41,12 +41,12 @@ public class CommandTeleport
 					.then(
 						Commands.argument("position", BlockPosArgument.blockPos())
 							.executes(context -> {
-								return tp(context.getSource(), TeleportMode.ToPosition, DimensionArgument.getDimension(context, "dimension"), BlockPosArgument.getOrLoadBlockPos(context, "position"), null, null);
+								return tp(context.getSource(), TeleportMode.ToPosition, DimensionArgument.getDimension(context, "dimension"), BlockPosArgument.getLoadedBlockPos(context, "position"), null, null);
 							})
 							.then(
 								Commands.argument("player", EntityArgument.player())		// tpd <dimension> [<x> <y> <z>] [player]
 									.executes(context -> {
-										return tp(context.getSource(), TeleportMode.ToPosition, DimensionArgument.getDimension(context, "dimension"), BlockPosArgument.getOrLoadBlockPos(context, "position"), null, EntityArgument.getPlayer(context, "player"));
+										return tp(context.getSource(), TeleportMode.ToPosition, DimensionArgument.getDimension(context, "dimension"), BlockPosArgument.getLoadedBlockPos(context, "position"), null, EntityArgument.getPlayer(context, "player"));
 									})
 							)
 					)

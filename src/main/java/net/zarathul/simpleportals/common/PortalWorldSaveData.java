@@ -16,13 +16,13 @@ public class PortalWorldSaveData extends SavedData
 	
 	public PortalWorldSaveData()
 	{
-		super(DATA_NAME);
 	}
 
-	@Override
-	public void load(CompoundTag tag)
+	public static PortalWorldSaveData load(CompoundTag tag)
 	{
 		PortalRegistry.readFromNBT(tag);
+
+		return new PortalWorldSaveData();
 	}
 
 	@Override
@@ -37,6 +37,6 @@ public class PortalWorldSaveData extends SavedData
 		if (world == null) return null;
 		DimensionDataStorage storage = world.getDataStorage();
 
-		return storage.computeIfAbsent(PortalWorldSaveData::new, DATA_NAME);
+		return storage.computeIfAbsent(PortalWorldSaveData::load, PortalWorldSaveData::new, DATA_NAME);
 	}
 }

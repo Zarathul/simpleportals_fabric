@@ -222,20 +222,20 @@ public final class Utils
 
 		PlayerList playerList = player.server.getPlayerList();
 		playerList.sendPlayerPermissionLevel(player);
-		originDimension.removePlayerImmediately(player);
-		player.removed = false;
+		originDimension.removePlayerImmediately(player, Entity.RemovalReason.CHANGED_DIMENSION);
+		// player.remove(Entity.RemovalReason.CHANGED_DIMENSION); FIXME: No longer needed ?
 
 		player.setLevel(destinationDimension);
 		destinationDimension.addDuringPortalTeleport(player);
 
-		player.yRot = yaw;
-		player.xRot = pitch;
+		player.setYRot(yaw);
+		player.setXRot(pitch);
 		player.moveTo(destination.getX() + 0.5d, destination.getY(), destination.getZ() + 0.5d);
 
 		player.setDeltaMovement(Vec3.ZERO);
 
 		player.gameMode.setLevel(destinationDimension);
-		player.connection.send(new ClientboundPlayerAbilitiesPacket(player.abilities));
+		player.connection.send(new ClientboundPlayerAbilitiesPacket(player.getAbilities()));
 		playerList.sendLevelInfo(player, destinationDimension);
 		playerList.sendAllPlayerInfo(player);
 
@@ -269,7 +269,7 @@ public final class Utils
 	 */
 	private static Entity teleportNonPlayerEntityToDimension(Entity entity, ResourceKey<Level> dimensionKey, BlockPos destination, float yaw)
 	{
-		if (entity.level instanceof ServerLevel && !entity.removed)
+		if (entity.level instanceof ServerLevel && !entity.isRemoved())
 		{
 			MinecraftServer server = entity.getServer();
 			if (server == null)	return entity;
@@ -285,9 +285,10 @@ public final class Utils
 			if (newEntity != null)
 			{
 				newEntity.restoreFrom(entity);
-				newEntity.moveTo(destination.getX(), destination.getY(), destination.getZ(), yaw, newEntity.xRot);
+				newEntity.moveTo(destination.getX(), destination.getY(), destination.getZ(), yaw, newEntity.getXRot());
 				newEntity.setDeltaMovement(Vec3.ZERO);
-				destinationWorld.addFromAnotherDimension(newEntity);
+				//destinationWorld.addFromAnotherDimension(newEntity); FIXME: remove
+				destinationWorld.addDuringTeleport(newEntity);
 			}
 
 			// This mixin might be overkill, since all this method does 99.9% of the time is setting Entity.removed

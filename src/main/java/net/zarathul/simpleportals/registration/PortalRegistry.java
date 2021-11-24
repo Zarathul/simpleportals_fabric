@@ -605,8 +605,7 @@ public final class PortalRegistry
 	 */
 	private static boolean isValidAddressBlock(BlockState state)
 	{
-		// Note: The isEntityBlock() only performs a type check of the block!
-		return (state != null && !state.getBlock().isEntityBlock() && !state.isAir());
+		return (state != null && !state.hasBlockEntity() && !state.isAir());
 	}
 	
 	/**

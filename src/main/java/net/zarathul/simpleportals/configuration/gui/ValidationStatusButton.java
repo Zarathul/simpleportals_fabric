@@ -6,6 +6,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.network.chat.TextComponent;
 
 @Environment(EnvType.CLIENT)
@@ -43,8 +44,9 @@ class ValidationStatusButton extends Button
 	@Override
 	public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float partialTicks)
 	{
-		Minecraft.getInstance().getTextureManager().bind(Button.WIDGETS_LOCATION);
-		RenderSystem.color4f(1.0F, 1.0F, 1.0F, 1.0F);
+		RenderSystem.setShader(GameRenderer::getPositionTexShader);
+		RenderSystem.setShaderTexture(0, Button.WIDGETS_LOCATION);
+		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
 		Icon icon = (this.valid) ? Icon.VALID : Icon.INVALID;
 
 		this.blit(poseStack, this.x, this.y, icon.getX(), icon.getY(), this.width, this.height);

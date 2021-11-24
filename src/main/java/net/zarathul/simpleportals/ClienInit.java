@@ -20,14 +20,27 @@ public class ClienInit implements ClientModInitializer
 	{
 		BlockRenderLayerMap.INSTANCE.putBlock(SimplePortals.blockPortal, RenderType.translucent());
 
-		// Register client side only command to show the config.
+		// Register client side only command to show the config in the command tree (/sportals config).
+		// TODO: check behavior with dedicated server
+
 		CommandRegistrationCallback.EVENT.register((dispatcher, isDedicatedServer) -> {
 			if (isDedicatedServer) return;
 
+			// config command
 			LiteralCommandNode<CommandSourceStack> configCommand = Commands
 					.literal("config")		// sportals config
+					.requires(commandSource -> {
+						return commandSource.hasPermission(4);
+					})
 					.executes(context -> {
-						Minecraft.getInstance().setScreen(new ConfigGui(new TextComponent("SimplePortals"), null, Settings.class, SimplePortals.MOD_ID));
+						Minecraft client = Minecraft.getInstance();
+						if (!client.isSameThread())
+						{
+							client.execute(() -> {
+								client.setScreen(new ConfigGui(new TextComponent("SimplePortals"), null, Settings.class, SimplePortals.MOD_ID));
+							});
+						}
+
 						return 1;
 					})
 					.build();

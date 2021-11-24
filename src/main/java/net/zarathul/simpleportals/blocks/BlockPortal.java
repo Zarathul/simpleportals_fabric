@@ -119,7 +119,7 @@ public class BlockPortal extends Block
 					return;
 				}
 
-				if ((PortalRegistry.getPower(start) < Settings.powerCapacity) && itemStack.getItem().is(Settings.powerSourceTag))
+				if ((PortalRegistry.getPower(start) < Settings.powerCapacity) && itemStack.is(Settings.powerSourceTag))
 				{
 					int surplus = PortalRegistry.addPower(start, itemStack.getCount());
 
@@ -131,7 +131,7 @@ public class BlockPortal extends Block
 					}
 					else
 					{
-						entity.remove();
+						entity.remove(Entity.RemovalReason.DISCARDED);
 					}
 
 					return;
