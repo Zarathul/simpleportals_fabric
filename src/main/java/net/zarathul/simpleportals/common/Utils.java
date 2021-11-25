@@ -352,7 +352,7 @@ public final class Utils
 		String      path = components[1];
 
 		return (namespace.chars().allMatch(c -> (c == '_' || c == '-' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '.')) &&
-				     path.chars().allMatch(c -> (c == '_' || c == '-' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '.' || c == '/')));
+					 path.chars().allMatch(c -> (c == '_' || c == '-' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '.' || c == '/')));
 	}
 
 	/**
@@ -389,5 +389,15 @@ public final class Utils
 	public static Direction getDirectionByName(String name)
 	{
 		return (name == null) ? null : DIRECTION_NAME_MAP.get(name.toLowerCase(Locale.ROOT));
+	}
+
+	/**
+	 * Gets a better readable string for the passed in BlockPos than what toString() offers.
+	 * @return
+	 * A string of the format "x=1234, z=1234, y=1234".
+	 */
+	public static String getReadablyBlockPos(BlockPos pos)
+	{
+		return String.format("x=%d, z=%d, y=%d", pos.getX(), pos.getZ(), pos.getY());
 	}
 }

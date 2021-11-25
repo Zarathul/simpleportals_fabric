@@ -4,18 +4,19 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractSelectionList;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.ImageButton;
-import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.TranslatableComponent;
 import net.zarathul.simpleportals.configuration.Config;
 import net.zarathul.simpleportals.configuration.ConfigSetting;
 import net.zarathul.simpleportals.configuration.StorageMethods;
@@ -37,6 +38,8 @@ public class ConfigGui extends Screen
 	private String configName;
 
 	private static final int PADDING = 5;
+	private static final int BUTTON_HEIGHT = 20;
+	private static final int ENTRY_HEIGHT = 26;
 
 	public ConfigGui(TextComponent title, Screen parent, Class<?> settingsType, String configName)
 	{
@@ -50,24 +53,22 @@ public class ConfigGui extends Screen
 	@Override
 	protected void init()
 	{
-		int titleHeight = minecraft.font.wordWrapHeight(title.getString(), width - 2 * PADDING);
-		int paddedTitleHeight = titleHeight + PADDING * 2;
-
+		int titleHeight = Math.max(minecraft.font.wordWrapHeight(title.getString(), width - 2 * PADDING), BUTTON_HEIGHT);
 		int optionListHeaderHeight = titleHeight + 2 * PADDING;
-		this.optionList = new ModOptionList(this.settingsType, minecraft, width, height, optionListHeaderHeight, height - optionListHeaderHeight, 26);
+		this.optionList = new ModOptionList(this.settingsType, minecraft, width, height, optionListHeaderHeight, height, ENTRY_HEIGHT);
 		addRenderableWidget(optionList);
 
-		addButton(width - 120 - 2 * PADDING, 0, 60, paddedTitleHeight, "Back", button -> minecraft.setScreen(parent));
-		addButton(width - 60 - PADDING, 0, 60, paddedTitleHeight, "Save", button -> {
+		addButton(width - 120 - 2 * PADDING, PADDING, 60, "config.back", button -> minecraft.setScreen(parent));
+		addButton(width - 60 - PADDING, PADDING, 60, "config.save", button -> {
 			this.optionList.commitChanges();
 			Config.save(this.configName, this.settingsType);
 			minecraft.setScreen(parent);
 		});
 	}
 
-	private void addButton(int x, int y, int width, int height, String label, Button.OnPress pressHandler)
+	private void addButton(int x, int y, int width, String i18nKey, Button.OnPress pressHandler)
 	{
-		Button button = new Button(x, y, width, height, new TextComponent(label), pressHandler);
+		Button button = new Button(x, y, width, BUTTON_HEIGHT, new TranslatableComponent(i18nKey), pressHandler);
 		addRenderableWidget(button);
 	}
 
@@ -76,10 +77,8 @@ public class ConfigGui extends Screen
 	{
 		this.renderBackground(poseStack);
 		RenderSystem.setShader(GameRenderer::getPositionTexShader);
-		// FIXME: obsolete?
-		// RenderSystem.disableLighting();	// Rendering the tooltip enables lighting but buttons etc. assume lighting to be disabled.
 		super.render(poseStack, mouseX, mouseY, partialTicks);
-		minecraft.font.draw(poseStack, title.getVisualOrderText(), PADDING, PADDING, 16777215);
+		minecraft.font.draw(poseStack, title.getVisualOrderText(), PADDING, PADDING, ChatFormatting.WHITE.getColor());
 	}
 
 	@Override
@@ -128,9 +127,9 @@ public class ConfigGui extends Screen
 
 		public void tick()
 		{
-			for (GuiEventListener child : this.children())
+			for (Entry child : this.children())
 			{
-				((Entry)child).tick();
+				child.tick();
 			}
 		}
 
@@ -144,24 +143,6 @@ public class ConfigGui extends Screen
 		protected int getScrollbarPosition()
 		{
 			return width - LEFT_RIGHT_BORDER;
-		}
-
-		@Override
-		public boolean mouseClicked(double x, double y, int button)
-		{
-			if (super.mouseClicked(x, y, button))
-			{
-				GuiEventListener focusedChild = getFocused();
-
-				for (GuiEventListener child : this.children())
-				{
-					if (child != focusedChild) ((Entry)child).clearFocus();
-				}
-
-				return true;
-			}
-
-			return false;
 		}
 
 		public void commitChanges()
@@ -209,7 +190,6 @@ public class ConfigGui extends Screen
 		@Environment(EnvType.CLIENT)
 		public abstract class Entry extends AbstractSelectionList.Entry<ConfigGui.ModOptionList.Entry>
 		{
-			public abstract void clearFocus();
 			public abstract void commitChanges();
 			public abstract void tick();
 			public abstract String getTooltip();
@@ -230,18 +210,13 @@ public class ConfigGui extends Screen
 			@Override
 			public void render(PoseStack poseStack, int index, int top, int left, int width, int height, int mouseX, int mouseY, boolean isHot, float partialTicks)
 			{
-				minecraft.font.drawShadow(poseStack, this.text, minecraft.screen.width / 2.0f - this.width / 2.0f, top + height - 9 - 1, 16777215);
+				minecraft.font.drawShadow(poseStack, this.text, minecraft.screen.width / 2.0f - this.width / 2.0f, top + height - 9 - 1, ChatFormatting.WHITE.getColor());
 			}
 
 			@Override
 			public boolean changeFocus(boolean forward)
 			{
 				return false;
-			}
-
-			@Override
-			public void clearFocus()
-			{
 			}
 
 			@Override
@@ -318,23 +293,23 @@ public class ConfigGui extends Screen
 
 				if (value instanceof Boolean)
 				{
-					this.checkBox = new CheckboxButtonEx(0, 0, 20, 20, TextComponent.EMPTY, (boolean)value);
+					this.checkBox = new CheckboxButtonEx(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, TextComponent.EMPTY, (boolean)value);
 
 					addRenderableWidget(this.checkBox);
 				}
 				else if (value instanceof Enum)
 				{
-					this.enumButton = new EnumOptionButton(value.getClass(), value.toString(), 0, 0, 100, itemHeight - PADDING);
+					this.enumButton = new EnumOptionButton(value.getClass(), value.toString(), 0, 0, 100, BUTTON_HEIGHT);
 
 					addRenderableWidget(this.enumButton);
 				}
 				else
 				{
-					this.editBox = new EditBox(minecraft.font, 0, 0, 100, itemHeight - PADDING, TextComponent.EMPTY);
-					this.editBox.setTextColor(16777215);
-					if (value != null) this.editBox.setValue(value.toString());
+					this.editBox = new EditBox(minecraft.font, 0, 0, 100, BUTTON_HEIGHT, TextComponent.EMPTY);
+					this.editBox.setTextColor(ChatFormatting.WHITE.getColor());
 					this.editBox.setMaxLength(256);
 					this.editBox.setCanLoseFocus(true);
+					if (value != null) this.editBox.setValue(value.toString());
 					this.editBox.setFilter(this::validateTextFieldInput);
 
 					addRenderableWidget(this.editBox);
@@ -387,7 +362,7 @@ public class ConfigGui extends Screen
 				int descriptionWidth = minecraft.font.width(description);
 				int descriptionLeft = left + (width / 2) - descriptionWidth - PADDING;
 				int descriptionTop = top + (itemHeight / 2) - PADDING - minecraft.font.lineHeight / 2 + 2;
-				minecraft.font.drawShadow(poseStack, description, descriptionLeft, descriptionTop, 16777215);
+				minecraft.font.drawShadow(poseStack, description, descriptionLeft, descriptionTop, ChatFormatting.WHITE.getColor());
 
 				// Set tooltip to be rendered by the ModOptionList. This could be moved to mouseMoved(), but either
 				// the tooltip for the description text would have to stay here or its bounds would have to be stored.
@@ -423,15 +398,6 @@ public class ConfigGui extends Screen
 				else
 				{
 					this.tooltipText = null;
-				}
-			}
-
-			@Override
-			public void clearFocus()
-			{
-				if (this.editBox != null)
-				{
-					this.editBox.setFocus(false);
 				}
 			}
 

@@ -7,9 +7,12 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.commands.synchronization.ArgumentTypes;
 import net.minecraft.commands.synchronization.EmptyArgumentSerializer;
 import net.minecraft.core.Registry;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -35,10 +38,13 @@ import net.zarathul.simpleportals.configuration.Config;
 import net.zarathul.simpleportals.items.ItemPortalActivator;
 import net.zarathul.simpleportals.items.ItemPortalFrame;
 import net.zarathul.simpleportals.items.ItemPowerGauge;
+import net.zarathul.simpleportals.registration.Portal;
+import net.zarathul.simpleportals.registration.PortalRegistry;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class SimplePortals implements ModInitializer
@@ -46,6 +52,8 @@ public class SimplePortals implements ModInitializer
 	// constants
 	public static final String MOD_ID = "simpleportals";
 	public static final String SIMPLE_MODS_ID = "simplemods";
+	public static final ResourceLocation LIST_COMMAND_PACKET_ID = new ResourceLocation(MOD_ID, "list_command");
+
 
 	// block and item names
 	public static final String BLOCK_PORTAL_NAME = "portal";
@@ -77,7 +85,8 @@ public class SimplePortals implements ModInitializer
 	public static LinkedBlockingQueue<TeleportTask> TELEPORT_QUEUE = new LinkedBlockingQueue<>();
 
 	@Override
-	public void onInitialize() {
+	public void onInitialize()
+	{
 		// Register custom block argument type for command parser.
 		ArgumentTypes.register(MOD_ID + ":block_argument", BlockArgument.class, new EmptyArgumentSerializer(BlockArgument::block));
 
@@ -177,6 +186,23 @@ public class SimplePortals implements ModInitializer
 			}
 
 			return  InteractionResult.PASS;
+		});
+
+		// Server side receiver for the list command. Responsible for sending back portal data to the client.
+		ServerPlayNetworking.registerGlobalReceiver(LIST_COMMAND_PACKET_ID, (server, player, packetListener, receiveBuffer, sender) -> {
+			if (!player.hasPermissions(4)) return;
+
+			List<Portal> portals = PortalRegistry.getAllPortals();
+
+			FriendlyByteBuf sendBuffer = PacketByteBufs.create();
+			sendBuffer.writeCollection(portals, (buffer, portal) -> {
+				buffer.writeResourceLocation(portal.getDimension().location());	// dimension
+				buffer.writeBlockPos(portal.getCorner1().getPos());				// location
+				buffer.writeNbt(portal.getAddress().serializeNBT());			// address
+				buffer.writeInt(PortalRegistry.getPower(portal));				// power
+			});
+
+			ServerPlayNetworking.send(player, LIST_COMMAND_PACKET_ID, sendBuffer);
 		});
 	}
 

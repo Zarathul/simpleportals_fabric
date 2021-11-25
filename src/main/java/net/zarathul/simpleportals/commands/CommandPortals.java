@@ -1,6 +1,5 @@
 package net.zarathul.simpleportals.commands;
 
-import com.google.common.collect.ImmutableListMultimap;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -20,14 +19,14 @@ import net.minecraft.tags.Tag;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
 import net.zarathul.simpleportals.Settings;
-import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.commands.arguments.BlockArgument;
 import net.zarathul.simpleportals.mixin.EntityAccessor;
 import net.zarathul.simpleportals.registration.Address;
 import net.zarathul.simpleportals.registration.Portal;
 import net.zarathul.simpleportals.registration.PortalRegistry;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
 import java.util.stream.Collectors;
 
 public class CommandPortals
@@ -64,45 +63,6 @@ public class CommandPortals
 					SendTranslatedMessage(context.getSource(), "commands.sportals.info");
 					return 1;
 				})
-				.then(
-					Commands.literal("list")
-						.executes(context -> {
-							SendTranslatedMessage(context.getSource(), "commands.sportals.list.info");
-							return 1;
-						})
-						.then(
-							Commands.literal("all")		// sportals list all
-								.executes(context -> {
-									return list(context.getSource(), ListMode.All, null, null);
-								})
-						)
-						.then(
-							Commands.argument("address1", BlockArgument.block())
-								.then(
-									Commands.argument("address2", BlockArgument.block())
-										.then(
-											Commands.argument("address3", BlockArgument.block())
-												.then(
-													Commands.argument("address4", BlockArgument.block())		// sportals list <addressBlockId> <addressBlockId> <addressBlockId> <addressBlockId>
-														.executes(context -> {
-															Address address = new Address(PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address1")),
-																PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address2")),
-																PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address3")),
-																PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address4")));
-
-															return list(context.getSource(), ListMode.Address, address, null);
-														})
-												)
-										)
-								)
-						)
-						.then(
-							Commands.argument("dimension", DimensionArgument.dimension())		// sportals list <dimension>
-								.executes(context -> {
-									return list(context.getSource(), ListMode.Dimension, null, DimensionArgument.getDimension(context, "dimension"));
-								})
-						)
-				)
 				.then(
 					Commands.literal("deactivate")
 						.executes(context -> {
@@ -267,66 +227,6 @@ public class CommandPortals
 						)
 				)
 		);
-	}
-
-	private static int list(CommandSourceStack source, ListMode mode, Address address, ServerLevel dimensionLevel)
-	{
-		List<Portal> portals;
-
-		switch (mode)
-		{
-			case All:
-				// sportals list all
-				ImmutableListMultimap<Address, Portal> addresses = PortalRegistry.getAddresses();
-
-				Set<Address> uniqueAddresses = new HashSet<>(addresses.keys());
-				List<Portal> portalsForAddress;
-				portals = new ArrayList<>();
-
-				for (Address addr : uniqueAddresses)
-				{
-					portalsForAddress = addresses.get(addr);
-					portals.addAll(portalsForAddress);
-				}
-
-				break;
-
-			case Address:
-				// sportals list <addressBlockId> <addressBlockId> <addressBlockId> <addressBlockId>
-				portals = PortalRegistry.getPortalsWithAddress(address);
-				break;
-
-			case Dimension:
-				// sportals list <dimension>
-				portals = PortalRegistry.getPortalsInDimension(dimensionLevel.dimension());
-				break;
-
-			default:
-				portals = new ArrayList<>();
-		}
-
-		SimplePortals.log.info("Registered portals");
-		SimplePortals.log.info("|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|");
-		SimplePortals.log.info("| Dimension                                | Position                    | Power | Address                                                                                                                                                |");
-		SimplePortals.log.info("|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|");
-
-		BlockPos portalBlockPos;
-		String formattedPortalBlockPos;
-
-		for (Portal portal : portals)
-		{
-			portalBlockPos = portal.getCorner1().getPos();
-			formattedPortalBlockPos = String.format("x=%d, y=%d, z=%d", portalBlockPos.getX(), portalBlockPos.getY(), portalBlockPos.getZ());
-
-			SimplePortals.log.info(String.format("| %40s | %27s | %5d | %-150s |",
-				portal.getDimension().location(), formattedPortalBlockPos, PortalRegistry.getPower(portal), portal.getAddress()));
-		}
-
-		SimplePortals.log.info("|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|");
-
-		SendTranslatedMessage(source, "commands.sportals.list.success");
-
-		return 1;
 	}
 
 	private static int deactivate(CommandSourceStack source, DeactivateMode mode, Address address, BlockPos pos, ServerLevel dimensionLevel)

@@ -83,5 +83,19 @@
 	"config.ambient_sound_enabled": "Enable Ambient Sound",
 	"config.ambient_sound_enabled.tooltip": "If enabled, portals emit an ambient sound.",
 	"config.teleportation_sound_enabled": "Enable Teleportation Sound",
-	"config.teleportation_sound_enabled.tooltip": "If enabled, a sound effect is played to the player after a successful teleportation."
+	"config.teleportation_sound_enabled.tooltip": "If enabled, a sound effect is played to the player after a successful teleportation.",
+	"config.back": "Back",
+	"config.apply": "Apply",
+	"config.save": "Save",
+	"config.filter_by": "Filter by:",
+	"config.enums.type.none": "None",
+	"config.enums.type.dimension": "Dimension",
+	"config.enums.type.location": "Location",
+	"config.enums.type.address": "Address",
+	"config.enums.type.power": "Power",
+	"config.enums.condition.none": "None",
+	"config.enums.condition.equals": "Equals",
+	"config.enums.condition.greaterthan": "Greater Than",
+	"config.enums.condition.lessthan": "Less Than",
+	"config.enums.condition.contains": "Contains"
 }

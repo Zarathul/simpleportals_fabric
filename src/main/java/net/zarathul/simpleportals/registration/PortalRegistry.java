@@ -295,7 +295,7 @@ public final class PortalRegistry
 	{
 		Set<Portal> uniquePortals = new HashSet<>(portals.values());
 
-		return uniquePortals.stream().filter(portal -> portal.getDimension() == dimension).collect(Collectors.toList());
+		return uniquePortals.stream().filter(portal -> portal.getDimension() == dimension).toList();
 	}
 
 	/**
@@ -314,6 +314,19 @@ public final class PortalRegistry
 		List<Portal> foundPortals = new ArrayList<>(addresses.get(address));
 		
 		return Collections.unmodifiableList(foundPortals);
+	}
+
+	/**
+	 * Gets all portals in every dimension.
+	 *
+	 * @return
+	 * A read-only list of all portals (may be empty).
+	 */
+	public static List<Portal> getAllPortals()
+	{
+		Set<Portal> uniquePortals = new HashSet<>(portals.values());
+
+		return new ArrayList<>(uniquePortals);
 	}
 
 	/**

@@ -83,5 +83,19 @@
 	"config.ambient_sound_enabled": "Umgebungsgeräusch an",
 	"config.ambient_sound_enabled.tooltip": "Wenn aktiviert, geben Portale Umgebungsgeräusche ab.",
 	"config.teleportation_sound_enabled": "Teleportationsgeräusch an",
-	"config.teleportation_sound_enabled.tooltip": "Wenn aktiviert, hören Spieler einen Geräuscheffekt wenn sie erfolgreich teleportiert wurden."
+	"config.teleportation_sound_enabled.tooltip": "Wenn aktiviert, hören Spieler einen Geräuscheffekt wenn sie erfolgreich teleportiert wurden.",
+	"config.back": "Zurück",
+	"config.apply": "Anwenden",
+	"config.save": "Speichern",
+	"config.filter_by": "Filtern nach:",
+	"config.enums.type.none": "Nichts",
+	"config.enums.type.dimension": "Dimension",
+	"config.enums.type.location": "Standort",
+	"config.enums.type.address": "Adresse",
+	"config.enums.type.power": "Energie",
+	"config.enums.condition.none": "Nichts",
+	"config.enums.condition.equals": "Gleich",
+	"config.enums.condition.greaterthan": "Größer als",
+	"config.enums.condition.lessthan": "Kleiner als",
+	"config.enums.condition.contains": "Beinhaltet"
 }
