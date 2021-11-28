@@ -97,5 +97,10 @@
 	"config.enums.condition.equals": "Equals",
 	"config.enums.condition.greaterthan": "Greater Than",
 	"config.enums.condition.lessthan": "Less Than",
-	"config.enums.condition.contains": "Contains"
+	"config.enums.condition.contains": "Contains",
+	"config.portal_list_header": "§nPortals",
+	"config.dimension_header": "§nDimension",
+	"config.location_header": "§nLocation",
+	"config.address_header": "§nAddress",
+	"config.power_header": "§nPower"
 }

@@ -44,7 +44,7 @@ public class ClienInit implements ClientModInitializer
 						if (!client.isSameThread())
 						{
 							client.execute(() -> {
-								client.setScreen(new ConfigGui(new TextComponent("SimplePortals"), null, Settings.class, SimplePortals.MOD_ID));
+								client.setScreen(new ConfigGui(new TextComponent("§nSimplePortals"), null, Settings.class, SimplePortals.MOD_ID));
 							});
 						}
 

@@ -6,6 +6,7 @@ import net.minecraft.nbt.CompoundTag;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
+import java.util.function.BiConsumer;
 
 /**
  * Represents the address of a portal.<br>
@@ -30,6 +31,7 @@ public class Address
 	{
 		this();
 		initBlockCounts(blockIds);
+		generateReadableName();
 	}
 	
 	/**
@@ -50,7 +52,15 @@ public class Address
 		
 		return 0;
 	}
-	
+
+	/**
+	 * Executes the passed in action on every block name/count pair.
+	 */
+	public void forEachAddressComponent(BiConsumer<String, Integer> action)
+	{
+		blockCounts.forEach(action);
+	}
+
 	public CompoundTag serializeNBT()
 	{
 		CompoundTag mainTag = new CompoundTag();
@@ -84,7 +94,7 @@ public class Address
 			blockCounts.put(countTag.getString("id"), countTag.getInt("count"));
 		}
 		
-		readableName = generateReadableName();
+		generateReadableName();
 	}
 	
 	@Override
@@ -147,8 +157,6 @@ public class Address
 					}
 				}
 			}
-			
-			readableName = generateReadableName();
 		}
 	}
 	
@@ -159,9 +167,9 @@ public class Address
 	 * A string of the format <code>blockIdxblockCount</code> for every
 	 * block id, delimited by "<code>,</code>".
 	 */
-	private String generateReadableName()
+	private void generateReadableName()
 	{
-		if (blockCounts == null) return null;
+		if (blockCounts == null) return;
 		
 		StringBuilder nameBuilder = new StringBuilder();
 		
@@ -175,6 +183,6 @@ public class Address
 		
 		nameBuilder.delete(nameBuilder.length() - 2, nameBuilder.length());
 		
-		return nameBuilder.toString();
+		readableName = nameBuilder.toString();
 	}
 }

@@ -24,9 +24,7 @@ import net.zarathul.simpleportals.mixin.DirectionAccessor;
 import net.zarathul.simpleportals.mixin.EntityAccessor;
 import net.zarathul.simpleportals.mixin.ServerPlayerAccessor;
 
-import java.util.ArrayList;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
 /**
  * General utility class.
