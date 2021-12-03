@@ -290,7 +290,7 @@ public final class Utils
 			}
 
 			// This mixin might be overkill, since all this method does 99.9% of the time is setting Entity.removed
-			// to true, but who knows what other peoples mods do. Better save than sorry I guess.
+			// to true, but who knows what other peoples mods do. Better safe than sorry I guess.
 			((EntityAccessor)entity).invokeRemoveAfterChangingDimensions();
 
 			originWorld.resetEmptyTime();
@@ -315,15 +315,13 @@ public final class Utils
 	{
 		if (facing == null) return 0;
 
-		float yaw;
-
-		switch (facing)
+		float yaw = switch (facing)
 		{
-			case EAST:  yaw = 270.0f; break;
-			case WEST:  yaw =  90.0f; break;
-			case NORTH:	yaw = 180.0f; break;
-			default:	yaw =   0.0f; break;
-		}
+			case EAST  -> 270.0f;
+			case WEST  -> 90.0f;
+			case NORTH -> 180.0f;
+			default    -> 0.0f;
+		};
 
 		return yaw;
 	}
@@ -365,7 +363,7 @@ public final class Utils
 		public static final int SKIP_NEIGHBOUR_SHAPE_UPDATE = 16;
 		/**
 		 * Unsure about that name (IS_MOVING). Forge called it that way.
-		 * Get's passed as true to {@link net.minecraft.world.level.block.Block#onRemove(BlockState, Level, BlockPos, BlockState, boolean)}
+		 * Gets passed as true to {@link net.minecraft.world.level.block.Block#onRemove(BlockState, Level, BlockPos, BlockState, boolean)}
 		 * when set.
 		* */
 		public static final int IS_MOVING = 64;

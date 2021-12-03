@@ -21,16 +21,11 @@ import net.zarathul.simpleportals.registration.PortalRegistry;
 import java.util.List;
 
 /**
- * Represents the frame of the portal mutliblock.
+ * Represents the frame of the portal multi-block.
  */
 public class BlockPortalFrame extends Block
 {
 	public BlockPortalFrame()
-	{
-		this(SimplePortals.BLOCK_PORTAL_FRAME_NAME);
-	}
-	
-	public BlockPortalFrame(String registryName)
 	{
 		super(Block.Properties.of(Material.STONE, MaterialColor.COLOR_BLACK)
 				.strength(50.0f, 200.0f)

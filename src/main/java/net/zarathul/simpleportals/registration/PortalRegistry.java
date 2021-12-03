@@ -24,11 +24,11 @@ import java.util.stream.Collectors;
  */
 public final class PortalRegistry
 {
-	private static ImmutableMap<Direction,Direction[]> cornerSearchDirs;
-	private static ListMultimap<BlockPos, Portal> portals;
-	private static ListMultimap<Address, Portal> addresses;
-	private static ListMultimap<Portal, BlockPos> gauges;
-	private static HashMap<Portal, Integer> power;
+	private static final ImmutableMap<Direction,Direction[]> cornerSearchDirs;
+	private static final ListMultimap<BlockPos, Portal> portals;
+	private static final ListMultimap<Address, Portal> addresses;
+	private static final ListMultimap<Portal, BlockPos> gauges;
+	private static final HashMap<Portal, Integer> power;
 	
 	static
 	{
@@ -66,7 +66,7 @@ public final class PortalRegistry
 	 * @param world
 	 * The {@link ServerLevel} the portal is located in.
 	 * @param pos
-	 * The {@link BlockPos} of the a portal frame.
+	 * The {@link BlockPos} of the portal frame.
 	 * @param side
 	 * The {@link Direction} representing the side of the portal frame that was hit
 	 * by the portal activator.
@@ -77,24 +77,22 @@ public final class PortalRegistry
 	{
 		if (world == null || pos == null || side == null) return false;
 		
-		Corner corner = null;
 		Corner corner1 = null;
-		Corner corner2 = null;
-		Corner corner3 = null;
-		Corner corner4 = null;
+		Corner corner2;
+		Corner corner3;
+		Corner corner4;
 		Direction firstSearchDir = null;
 		
 		// Find corners
 		
 		for (Direction searchDir : cornerSearchDirs.get(side))
 		{
-			corner = findCorner(world, pos, searchDir, side);
+			corner1 = findCorner(world, pos, searchDir, side);
 			
-			if (corner != null)
+			if (corner1 != null)
 			{
 				firstSearchDir = searchDir;
-				corner1 = corner;
-				
+
 				break;
 			}
 		}
@@ -453,7 +451,7 @@ public final class PortalRegistry
 	}
 	
 	/**
-	 * Destroys the specified portals portal blocks (the center).
+	 * Destroys the specified portals' portal blocks (the center).
 	 * 
 	 * @param world
 	 * The {@link ServerLevel} the portal is located in.

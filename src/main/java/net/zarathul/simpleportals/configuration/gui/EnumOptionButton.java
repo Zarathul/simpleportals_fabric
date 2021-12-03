@@ -10,10 +10,10 @@ import net.minecraft.network.chat.TextComponent;
 @Environment(EnvType.CLIENT)
 public class EnumOptionButton<E extends Enum<E>> extends Button
 {
-	private Class<E> clazz;
+	private final Class<E> clazz;
 	private int selectedIndex;
-	private String[] names;
-	private TextComponent[] i18nNames;
+	private final String[] names;
+	private final TextComponent[] i18nNames;
 
 	private static final String I18N_ENUM_PREFIX = "config.enums.";
 	/**
@@ -25,7 +25,7 @@ public class EnumOptionButton<E extends Enum<E>> extends Button
 	{
 		super(x, y, width, height,
 			  new TextComponent(I18n.get(I18N_ENUM_PREFIX + clazz.getSimpleName().toLowerCase() + "." + value.toLowerCase())),
-			  (button) -> {;});
+			  (button) -> {});
 
 		this.clazz = clazz;
 		this.selectedIndex = 0;

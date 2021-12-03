@@ -9,7 +9,7 @@ import net.zarathul.simpleportals.configuration.ConfigSetting;
 
 public final class Settings
 {
-	@ConfigSetting(descriptionKey = "max_size", description = "The maximum size of the portal including the frame.", category = "common")
+	@ConfigSetting(descriptionKey = "max_size", description = "The maximum size of the portal including the frame.", category = "common", permissionLvl = 4)
 	public static int maxSize;
 	public static final int maxSizeDefault = 7;
 	public static boolean maxSizeValidator(int value)
@@ -17,7 +17,7 @@ public final class Settings
 		return ((value >= 3) && (value <= 128));
 	}
 
-	@ConfigSetting(descriptionKey = "power_cost", description = "The power cost per use of a portal. Set to 0 for no cost.", category = "common")
+	@ConfigSetting(descriptionKey = "power_cost", description = "The power cost per use of a portal. Set to 0 for no cost.", category = "common", permissionLvl = 4)
 	public static int powerCost;
 	public static final int powerCostDefault = 1;
 	public static boolean powerCostValidator(int value)
@@ -25,7 +25,7 @@ public final class Settings
 		return (value >= 0);
 	}
 
-	@ConfigSetting(descriptionKey = "power_capacity", description = "The amount of power a portal can store.", category = "common")
+	@ConfigSetting(descriptionKey = "power_capacity", description = "The amount of power a portal can store.", category = "common", permissionLvl = 4)
 	public static int powerCapacity;
 	public static final int powerCapacityDefault = 64;
 	public static boolean powerCapacityValidator(int value)
@@ -33,7 +33,7 @@ public final class Settings
 		return (value > 0);
 	}
 
-	@ConfigSetting(descriptionKey = "player_teleportation_delay", description = "The delay in ticks before a player actually gets teleported. Needs to be lower than the cooldown.", category = "common")
+	@ConfigSetting(descriptionKey = "player_teleportation_delay", description = "The delay in ticks before a player actually gets teleported. Needs to be lower than the cooldown.", category = "common", permissionLvl = 4)
 	public static int playerTeleportationDelay;
 	public static final int playerTeleportationDelayDefault = 10;
 	public static boolean playerTeleportationDelayValidator(int value)
@@ -41,7 +41,7 @@ public final class Settings
 		return ((value >= 0) && (value <= 40));
 	}
 
-	@ConfigSetting(descriptionKey = "player_teleportation_cooldown", description = "Cooldown in ticks before a player can be teleported again by a portal.", category = "common")
+	@ConfigSetting(descriptionKey = "player_teleportation_cooldown", description = "Cooldown in ticks before a player can be teleported again by a portal.", category = "common", permissionLvl = 4)
 	public static int playerTeleportationCooldown;
 	public static final int playerTeleportationCooldownDefault = 60;
 	public static boolean playerTeleportationCooldownValidator(int value)
@@ -49,7 +49,7 @@ public final class Settings
 		return (value >= 60);
 	}
 
-	@ConfigSetting(descriptionKey = "power_source", description = "The tag that items must have to be able to power portals (1 power per item).", category = "common")
+	@ConfigSetting(descriptionKey = "power_source", description = "The tag that items must have to be able to power portals (1 power per item).", category = "common", permissionLvl = 4)
 	public static ResourceLocation powerSource;
 	public static final ResourceLocation powerSourceDefault = new ResourceLocation("c:ender_pearls");
 	public static ResourceLocation powerSourceLoad(String value)
@@ -75,15 +75,15 @@ public final class Settings
 	}
 	public static Tag<Item> powerSourceTag;
 
-	@ConfigSetting(descriptionKey = "particles_enabled", description = "If enabled, portals emit particles (visual effect).", category = "client")
+	@ConfigSetting(descriptionKey = "particles_enabled", description = "If enabled, portals emit particles (visual effect).", category = "client", clientOnly = true)
 	public static boolean particlesEnabled;
 	public static final boolean particlesEnabledDefault = true;
 
-	@ConfigSetting(descriptionKey = "ambient_sound_enabled", description = "If enabled, portals emit an ambient sound.", category = "client")
+	@ConfigSetting(descriptionKey = "ambient_sound_enabled", description = "If enabled, portals emit an ambient sound.", category = "client", clientOnly = true)
 	public static boolean ambientSoundEnabled ;
 	public static final boolean ambientSoundEnabledDefault = false;
 
-	@ConfigSetting(descriptionKey = "teleportation_sound_enabled", description = "If enabled, a sound effect is played to the player after a successful teleportation.", category = "client")
+	@ConfigSetting(descriptionKey = "teleportation_sound_enabled", description = "If enabled, a sound effect is played to the player after a successful teleportation.", category = "client", clientOnly = true)
 	public static boolean teleportationSoundEnabled;
 	public static final boolean teleportationSoundEnabledDefault = true;
 }

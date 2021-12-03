@@ -5,22 +5,18 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.zarathul.simpleportals.Settings;
-import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.registration.Portal;
 import net.zarathul.simpleportals.registration.PortalRegistry;
 
 import java.util.List;
 
 /**
- * Represents a frame of the portal multiblock that supplies comparators with a redstone
+ * Represents a frame of the portal multi-block that supplies comparators with a redstone
  * signal. The signal strength is based on the amount of power stored inside the portal.
  */
 public class BlockPowerGauge extends BlockPortalFrame
 {
-	public BlockPowerGauge()
-	{
-		super(SimplePortals.BLOCK_POWER_GAUGE_NAME);
-	}
+	public BlockPowerGauge() { super();	}
 
 	@Override
 	public boolean hasAnalogOutputSignal(BlockState blockState)

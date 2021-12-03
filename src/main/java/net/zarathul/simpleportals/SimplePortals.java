@@ -11,8 +11,13 @@ import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.commands.synchronization.ArgumentTypes;
 import net.minecraft.commands.synchronization.EmptyArgumentSerializer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.Registry;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.ChatType;
+import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -30,6 +35,7 @@ import net.zarathul.simpleportals.blocks.BlockPortalFrame;
 import net.zarathul.simpleportals.blocks.BlockPowerGauge;
 import net.zarathul.simpleportals.commands.CommandPortals;
 import net.zarathul.simpleportals.commands.CommandTeleport;
+import net.zarathul.simpleportals.commands.ConfigCommandMode;
 import net.zarathul.simpleportals.commands.arguments.BlockArgument;
 import net.zarathul.simpleportals.common.PortalWorldSaveData;
 import net.zarathul.simpleportals.common.TeleportTask;
@@ -45,6 +51,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class SimplePortals implements ModInitializer
@@ -53,6 +60,8 @@ public class SimplePortals implements ModInitializer
 	public static final String MOD_ID = "simpleportals";
 	public static final String SIMPLE_MODS_ID = "simplemods";
 	public static final ResourceLocation LIST_COMMAND_PACKET_ID = new ResourceLocation(MOD_ID, "list_command");
+	public static final ResourceLocation CONFIG_COMMAND_PACKET_ID = new ResourceLocation(MOD_ID, "config_command");
+	public static final ResourceLocation TPD_COMMAND_PACKET_ID = new ResourceLocation(MOD_ID, "tpd_command");
 
 
 	// block and item names
@@ -188,21 +197,59 @@ public class SimplePortals implements ModInitializer
 			return  InteractionResult.PASS;
 		});
 
+		// Server side receiver for the config command. Responsible for sending back server side settings to the client.
+		ServerPlayNetworking.registerGlobalReceiver(CONFIG_COMMAND_PACKET_ID, (server, player, packetListener, receiveBuffer, sender) -> {
+			ConfigCommandMode mode = receiveBuffer.readEnum(ConfigCommandMode.class);
+
+			switch (mode)
+			{
+				case GetServerSettings ->
+				{
+					FriendlyByteBuf sendBuffer = PacketByteBufs.create();
+					Config.writeServerSettings(Settings.class, sendBuffer, player);
+
+					ServerPlayNetworking.send(player, CONFIG_COMMAND_PACKET_ID, sendBuffer);
+				}
+				case SetServerSettings ->
+				{
+					Config.readServerSettings(Settings.class, receiveBuffer, player);
+					Config.save(MOD_ID, Settings.class);
+				}
+			}
+		});
+
 		// Server side receiver for the list command. Responsible for sending back portal data to the client.
 		ServerPlayNetworking.registerGlobalReceiver(LIST_COMMAND_PACKET_ID, (server, player, packetListener, receiveBuffer, sender) -> {
-			if (!player.hasPermissions(4)) return;
+			if (!player.hasPermissions(4))
+			{
+				player.sendMessage(new TranslatableComponent("missing_permission"), ChatType.SYSTEM, UUID.randomUUID());
+				return;
+			}
 
 			List<Portal> portals = PortalRegistry.getAllPortals();
 
 			FriendlyByteBuf sendBuffer = PacketByteBufs.create();
 			sendBuffer.writeCollection(portals, (buffer, portal) -> {
-				buffer.writeResourceLocation(portal.getDimension().location());	// dimension
-				buffer.writeBlockPos(portal.getCorner1().getPos());				// location
-				buffer.writeNbt(portal.getAddress().serializeNBT());			// address
-				buffer.writeInt(PortalRegistry.getPower(portal));				// power
+				buffer.writeResourceLocation(portal.getDimension().location());		// dimension
+				buffer.writeBlockPos(portal.getCorner1().getPos());					// location
+				buffer.writeNbt(portal.getAddress().serializeNBT());				// address
+				buffer.writeInt(PortalRegistry.getPower(portal));					// power
 			});
 
 			ServerPlayNetworking.send(player, LIST_COMMAND_PACKET_ID, sendBuffer);
+		});
+
+		// Server side receiver for the tpd command. Responsible for actually teleporting the client around. This is currently used only from a button in the portal list.
+		ServerPlayNetworking.registerGlobalReceiver(TPD_COMMAND_PACKET_ID, (server, player, packetListener, receiveBuffer, sender) -> {
+			if (!player.hasPermissions(4))
+			{
+				player.sendMessage(new TranslatableComponent("missing_permission"), ChatType.SYSTEM, UUID.randomUUID());
+				return;
+			}
+
+			ResourceKey<Level> dimension = ResourceKey.create(Registry.DIMENSION_REGISTRY, receiveBuffer.readResourceLocation());	// dimension
+			BlockPos location = receiveBuffer.readBlockPos();																		// location
+			Utils.teleportTo(player, dimension, location, Direction.NORTH);
 		});
 	}
 

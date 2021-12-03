@@ -1,6 +1,8 @@
 package net.zarathul.simpleportals.configuration;
 
 import com.google.common.collect.Lists;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.world.entity.player.Player;
 
 import java.io.File;
 import java.io.IOException;
@@ -26,16 +28,16 @@ import java.util.Optional;
  *    holds the default value for the setting.
  *
  * 2) Optionally a public static method may exist, that takes one parameter of the same type as the setting
- *    field and returns a boolean. It has to have the same name as the setting with "Validator" appended
+ *    field and returns a Boolean. It has to have the same name as the setting with "Validator" appended
  *    (e.g. 'mySetting' and 'mySettingValidator'). This method is used for input validation.
  *
  * 3) int, float, boolean, enum and string are considered primitive types, everything else is a complex type.
  *
  * 4) For Complex types there must be two additional public static methods. One takes a string as a parameter
  *    and returns a value of the same type as the setting field. It has to have to same name as the field with
- *    'Load' appended (eg. 'mySetting' and 'mySettingLoad').
+ *    'Load' appended (e.g. 'mySetting' and 'mySettingLoad').
  *    The other one takes one parameter of the same type as the setting field and returns a string. It has to
- *    have to same name as the setting field with 'Save' appended (eg. 'mySetting' and 'mySettingSave').
+ *    have to same name as the setting field with 'Save' appended (e.g. 'mySetting' and 'mySettingSave').
  *    (Note: This was originally done using member function names of the setting field type stored in the
  *    ConfigSetting annotation. Unfortunately this only works in a Dev environment. In release all minecraft
  *    types have their original meaningless names restored and the reflection API can't find them anymore).
@@ -74,6 +76,110 @@ public final class Config
 
 		Path configFilePath = Paths.get(configFile.toURI());
 		createConfig(configFilePath, clazz, false);
+	}
+
+	/**
+	 * Writes the values of all non client-only settings, the player has the appropriate permission lvl for, into the passed in buffer.
+	 * This is used for changing settings on a dedicated server remotely.
+	 */
+	public static void writeServerSettings(Class<?> clazz, FriendlyByteBuf buffer, Player player)
+	{
+		ConfigSetting annotation;
+		Field[] fields = getSettingFieldsSortedByCategory(clazz);
+
+		for (Field field : fields)
+		{
+			if (!isValidSetting(field)) continue;
+
+			annotation = field.getAnnotation(ConfigSetting.class);
+			if (annotation.clientOnly() || !player.hasPermissions(annotation.permissionLvl())) continue;
+
+			try
+			{
+				if (field.getType() == int.class)
+				{
+					buffer.writeInt(field.getInt(null));
+				}
+				else if (field.getType() == float.class)
+				{
+					buffer.writeFloat(field.getFloat(null));
+				}
+				else if (field.getType() == boolean.class)
+				{
+					buffer.writeBoolean(field.getBoolean(null));
+				}
+				else if (field.getType() == String.class)
+				{
+					buffer.writeUtf((String)field.get(null));
+				}
+				else if (field.getType().isEnum())
+				{
+					buffer.writeInt(((Enum<?>)field.get(null)).ordinal());
+				}
+				else
+				{
+					StorageMethods storage = getLoadSave(field).get();
+					buffer.writeUtf((String)storage.save.invoke(null, field.get(null)));
+				}
+			}
+			catch (IllegalAccessException | InvocationTargetException ignored) {}
+		}
+	}
+
+	/**
+	 * Reads the values of all non client-only settings, the player has the appropriate permission lvl for, from the passed in buffer.
+	 * It is assumed that the buffer was filled by calling {@link Config#writeServerSettings(Class, FriendlyByteBuf, Player)} and that
+	 * the players permissions did not change between both calls.
+	 * This is used for changing settings on a dedicated server remotely.
+	 */
+	public static void readServerSettings(Class<?> clazz, FriendlyByteBuf buffer, Player player)
+	{
+		ConfigSetting annotation;
+		Field[] fields = getSettingFieldsSortedByCategory(clazz);
+
+		for (Field field : fields)
+		{
+			if (!isValidSetting(field)) continue;
+
+			annotation = field.getAnnotation(ConfigSetting.class);
+			if (annotation.clientOnly() || !player.hasPermissions(annotation.permissionLvl())) continue;
+
+			Method validator = getValidator(field);
+			Object value;
+
+			try
+			{
+				if (field.getType() == int.class)
+				{
+					value = buffer.readInt();
+				}
+				else if (field.getType() == float.class)
+				{
+					value = buffer.readFloat();
+				}
+				else if (field.getType() == boolean.class)
+				{
+					value = buffer.readBoolean();
+				}
+				else if (field.getType() == String.class)
+				{
+					value = buffer.readUtf();
+				}
+				else if (field.getType().isEnum())
+				{
+					value = ((Enum<?>[])field.getType().getEnumConstants())[buffer.readInt()];
+				}
+				else
+				{
+					StorageMethods storage = getLoadSave(field).get();
+					value = storage.load.invoke(null, buffer.readUtf());
+				}
+
+				field.set(null, value);
+				if ((validator != null) && (!(boolean)validator.invoke(null, value))) setToDefault(field);
+			}
+			catch (IllegalAccessException | InvocationTargetException ignored) {}
+		}
 	}
 
 	public static boolean isComplexType(Field field)
@@ -122,9 +228,7 @@ public final class Config
 		if (!isComplexType(field)) return true;
 
 		// Check if complex type has load and save methods.
-		if (!getLoadSave(field).isPresent()) return false;
-
-		return true;
+		return getLoadSave(field).isPresent();
 	}
 
 	public static Field[] getSettingFieldsSortedByCategory(Class<?> clazz)
@@ -265,7 +369,7 @@ public final class Config
 		{
 			Files.write(file, builder.toString().getBytes());
 		}
-		catch (IOException e) {}
+		catch (IOException ignored) {}
 	}
 
 	/**
@@ -273,7 +377,7 @@ public final class Config
 	 */
 	private static void appendPrimitiveTypeValue(Field field, ConfigSetting annotation, StringBuilder builder)
 	{
-		Object value = null;
+		Object value;
 
 		try
 		{
@@ -281,7 +385,7 @@ public final class Config
 
 			// :FIELD_SAVE_VALIDATION
 			// If the field has a validator and the fields value is not valid, set the field to the default value.
-			// The default value can technically also be invalid but at that point there's is no way to resolve this.
+			// The default value can technically also be invalid but at that point there is no way to resolve this.
 			Method validator = getValidator(field);
 			if ((validator != null) && (!(boolean)validator.invoke(null, value)))
 			{
@@ -328,7 +432,7 @@ public final class Config
 			builder.append(valueString);
 			builder.append("\n");
 		}
-		catch (IllegalAccessException | InvocationTargetException ex) {}
+		catch (IllegalAccessException | InvocationTargetException ignored) {}
 	}
 
 	private static void appendComment(StringBuilder builder, ConfigSetting annotation)
@@ -356,7 +460,7 @@ public final class Config
 			Method validator = getValidator(field);
 			if (validator != null) validator.invoke(null, defaultValue);
 		}
-		catch (IllegalAccessException | InvocationTargetException e) {}
+		catch (IllegalAccessException | InvocationTargetException ignored) {}
 	}
 
 	private static void loadConfig(Path file, Class<?> clazz)
@@ -405,7 +509,7 @@ public final class Config
 
 				loadedSettings.add(settingField);
 			}
-			catch (NoSuchFieldException e) {}
+			catch (NoSuchFieldException ignored) {}
 		}
 
 		// Set uninitialized setting fields to their default values, in case not all of them were loaded from file.

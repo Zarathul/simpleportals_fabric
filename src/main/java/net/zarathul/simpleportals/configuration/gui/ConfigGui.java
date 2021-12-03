@@ -17,6 +17,7 @@ import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.world.entity.player.Player;
 import net.zarathul.simpleportals.configuration.Config;
 import net.zarathul.simpleportals.configuration.ConfigSetting;
 import net.zarathul.simpleportals.configuration.StorageMethods;
@@ -27,27 +28,30 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Environment(EnvType.CLIENT)
 public class ConfigGui extends Screen
 {
-	private Screen parent;
 	private ModOptionList optionList;
-	private Class<?> settingsType;
-	private String configName;
+	private final Class<?> settingsType;
+	private final String configName;
+	private final Player player;
+	private final Consumer<Player> syncChanges;
 
 	private static final int PADDING = 5;
 	private static final int BUTTON_HEIGHT = 20;
 	private static final int ENTRY_HEIGHT = 26;
 
-	public ConfigGui(TextComponent title, Screen parent, Class<?> settingsType, String configName)
+	public ConfigGui(TextComponent title, Class<?> settingsType, String configName, Player player, Consumer<Player> syncChanges)
 	{
 		super(title);
 
-		this.parent = parent;
 		this.settingsType = settingsType;
 		this.configName = configName;
+		this.player = player;
+		this.syncChanges = syncChanges;
 	}
 
 	@Override
@@ -55,14 +59,15 @@ public class ConfigGui extends Screen
 	{
 		int titleHeight = Math.max(minecraft.font.wordWrapHeight(title.getString(), width - 2 * PADDING), BUTTON_HEIGHT);
 		int optionListHeaderHeight = titleHeight + 2 * PADDING;
-		this.optionList = new ModOptionList(this.settingsType, minecraft, width, height, optionListHeaderHeight, height, ENTRY_HEIGHT);
+		this.optionList = new ModOptionList(this.settingsType, player, minecraft, width, height, optionListHeaderHeight, height, ENTRY_HEIGHT);
 		addRenderableWidget(optionList);
 
-		addButton(width - 120 - 2 * PADDING, PADDING, 60, "config.back", button -> minecraft.setScreen(parent));
+		addButton(width - 120 - 2 * PADDING, PADDING, 60, "config.back", button -> minecraft.setScreen(null));
 		addButton(width - 60 - PADDING, PADDING, 60, "config.save", button -> {
 			this.optionList.commitChanges();
 			Config.save(this.configName, this.settingsType);
-			minecraft.setScreen(parent);
+			minecraft.setScreen(null);
+			if (syncChanges != null) syncChanges.accept(player);
 		});
 	}
 
@@ -98,10 +103,10 @@ public class ConfigGui extends Screen
 		private static final String I18N_INVALID = "config.input_invalid";
 		private static final String I18N_NEEDS_WORLD_RESTART = "config.needs_world_restart";
 
-		public ModOptionList(Class<?> settingsType, Minecraft mc, int width, int height, int top, int bottom, int itemHeight)
+		public ModOptionList(Class<?> settingsType, Player player, Minecraft mc, int width, int height, int top, int bottom, int itemHeight)
 		{
 			super(mc, width, height, top, bottom, itemHeight);
-			generateEntries(settingsType);
+			generateEntries(settingsType, player);
 		}
 
 		@Override
@@ -153,7 +158,7 @@ public class ConfigGui extends Screen
 			}
 		}
 
-		private void generateEntries(Class<?> clazz)
+		private void generateEntries(Class<?> clazz, Player player)
 		{
 			Field[] fields = Config.getSettingFieldsSortedByCategory(clazz);
 
@@ -178,7 +183,7 @@ public class ConfigGui extends Screen
 					lastCategory = category;
 				}
 
-				addEntry(new OptionEntry(valueField, annotation));
+				addEntry(new OptionEntry(valueField, annotation, player));
 			}
 		}
 
@@ -250,7 +255,7 @@ public class ConfigGui extends Screen
 			private final Method loadMethod;
 			private final ConfigSetting annotation;
 
-			public OptionEntry(Field valueField, ConfigSetting annotation)
+			public OptionEntry(Field valueField, ConfigSetting annotation, Player player)
 			{
 				this.valueField = valueField;
 				this.validatorMethod = Config.getValidator(valueField);
@@ -259,6 +264,8 @@ public class ConfigGui extends Screen
 				this.loadMethod = (loadSave.isPresent()) ? loadSave.get().load : null;
 
 				Object defaultValue = Config.getDefaultValue(valueField);
+
+				boolean widgetIsActive = player.hasPermissions(annotation.permissionLvl());
 
 				this.validatedButton = new ValidationStatusButton(0, 0, button -> {
 					if (this.editBox != null)
@@ -275,8 +282,9 @@ public class ConfigGui extends Screen
 						this.enumButton.setValue((Enum)defaultValue);
 					}
 				});
+				this.validatedButton.active = widgetIsActive;
 
-				this.needsWorldRestartButton = new ImageButton(0, 0, 15, 12, 182, 24, 0, Button.WIDGETS_LOCATION, 256, 256, (b) -> {;});
+				this.needsWorldRestartButton = new ImageButton(0, 0, 15, 12, 182, 24, 0, Button.WIDGETS_LOCATION, 256, 256, (b) -> {});
 				this.needsWorldRestartButton.active = false;
 				this.needsWorldRestartButton.visible = annotation.needsWorldRestart();
 
@@ -286,7 +294,7 @@ public class ConfigGui extends Screen
 				{
 					value = valueField.get(null);
 				}
-				catch (IllegalAccessException e) {}
+				catch (IllegalAccessException ignored) {}
 
 				addRenderableWidget(this.validatedButton);
 				addRenderableWidget(this.needsWorldRestartButton);
@@ -294,12 +302,14 @@ public class ConfigGui extends Screen
 				if (value instanceof Boolean)
 				{
 					this.checkBox = new CheckboxButtonEx(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, TextComponent.EMPTY, (boolean)value);
+					this.checkBox.active = widgetIsActive;
 
 					addRenderableWidget(this.checkBox);
 				}
 				else if (value instanceof Enum)
 				{
 					this.enumButton = new EnumOptionButton(value.getClass(), value.toString(), 0, 0, 100, BUTTON_HEIGHT);
+					this.enumButton.active = widgetIsActive;
 
 					addRenderableWidget(this.enumButton);
 				}
@@ -311,6 +321,8 @@ public class ConfigGui extends Screen
 					this.editBox.setCanLoseFocus(true);
 					if (value != null) this.editBox.setValue(value.toString());
 					this.editBox.setFilter(this::validateTextFieldInput);
+					this.editBox.active = widgetIsActive;
+					this.editBox.setEditable(widgetIsActive);
 
 					addRenderableWidget(this.editBox);
 				}
@@ -412,7 +424,7 @@ public class ConfigGui extends Screen
 					{
 						valueField.set(null, this.checkBox.value);
 					}
-					catch (IllegalAccessException ex) {}
+					catch (IllegalAccessException ignored) {}
 				}
 				else if (fieldType.isEnum())
 				{
@@ -420,7 +432,7 @@ public class ConfigGui extends Screen
 					{
 						valueField.set(null, this.enumButton.getValue());
 					}
-					catch (IllegalAccessException e) {}
+					catch (IllegalAccessException ignored) {}
 				}
 				else
 				{
@@ -463,7 +475,7 @@ public class ConfigGui extends Screen
 							}
 						}
 					}
-					catch (NumberFormatException | IllegalAccessException | InvocationTargetException ex) {}
+					catch (NumberFormatException | IllegalAccessException | InvocationTargetException ignored) {}
 				}
 			}
 
@@ -485,7 +497,7 @@ public class ConfigGui extends Screen
 			// Sets the state of the ValidationStatusButton button based on the input in the EditBox.
 			private boolean validateTextFieldInput(String text)
 			{
-				Object value = null;
+				Object value;
 
 				try
 				{

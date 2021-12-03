@@ -102,5 +102,6 @@
 	"config.dimension_header": "§nDimension",
 	"config.location_header": "§nLocation",
 	"config.address_header": "§nAddress",
-	"config.power_header": "§nPower"
+	"config.power_header": "§nPower",
+	"config.missing_permission": "Your are missing the required permissions for this command."
 }

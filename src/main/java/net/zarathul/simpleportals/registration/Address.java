@@ -20,7 +20,7 @@ public class Address
 	
 	private String readableName;
 	
-	private Map<String, Integer> blockCounts;
+	private final Map<String, Integer> blockCounts;
 
 	public Address()
 	{
@@ -163,8 +163,7 @@ public class Address
 	/**
 	 * Generates a readable representation of the address.
 	 * 
-	 * @return
-	 * A string of the format <code>blockIdxblockCount</code> for every
+	 * The format is <code>blockIdxblockCount</code> for every
 	 * block id, delimited by "<code>,</code>".
 	 */
 	private void generateReadableName()

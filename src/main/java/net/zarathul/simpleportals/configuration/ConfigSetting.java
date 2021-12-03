@@ -13,4 +13,6 @@ public @interface ConfigSetting
 	String descriptionKey();
 	String category() default "";
 	boolean needsWorldRestart() default false;
+	int permissionLvl() default 0;
+	boolean clientOnly() default false;
 }

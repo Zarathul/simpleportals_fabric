@@ -31,13 +31,6 @@ import java.util.stream.Collectors;
 
 public class CommandPortals
 {
-	private enum ListMode
-	{
-		All,
-		Address,
-		Dimension
-	}
-
 	private enum DeactivateMode
 	{
 		Address,
@@ -56,9 +49,7 @@ public class CommandPortals
 	{
 		dispatcher.register(
 			Commands.literal("sportals")
-				.requires((commandSource) -> {
-					return commandSource.hasPermission(4);
-				})
+				.requires((commandSource) -> commandSource.hasPermission(4))
 				.executes(context -> {
 					SendTranslatedMessage(context.getSource(), "commands.sportals.info");
 					return 1;
@@ -102,14 +93,10 @@ public class CommandPortals
 						)
 						.then(
 							Commands.argument("position", BlockPosArgument.blockPos())
-								.executes(context -> {
-									return deactivate(context.getSource(), DeactivateMode.Position, null, BlockPosArgument.getLoadedBlockPos(context, "position"), null);
-								})
+								.executes(context -> deactivate(context.getSource(), DeactivateMode.Position, null, BlockPosArgument.getLoadedBlockPos(context, "position"), null))
 								.then(
 									Commands.argument("dimension", DimensionArgument.dimension())		// sportals deactivate <x> <y> <z> [dimension]
-										.executes(context -> {
-											return deactivate(context.getSource(), DeactivateMode.Position, null, BlockPosArgument.getLoadedBlockPos(context, "position"), DimensionArgument.getDimension(context, "dimension"));
-										})
+										.executes(context -> deactivate(context.getSource(), DeactivateMode.Position, null, BlockPosArgument.getLoadedBlockPos(context, "position"), DimensionArgument.getDimension(context, "dimension")))
 								)
 						)
 				)
@@ -125,14 +112,10 @@ public class CommandPortals
 									Commands.argument("amount", IntegerArgumentType.integer(1))
 										.then(
 											Commands.argument("position", BlockPosArgument.blockPos())
-												.executes(context -> {
-													return power(context.getSource(), PowerMode.Add, IntegerArgumentType.getInteger(context, "amount"), BlockPosArgument.getLoadedBlockPos(context, "position"), null);
-												})
+												.executes(context -> power(context.getSource(), PowerMode.Add, IntegerArgumentType.getInteger(context, "amount"), BlockPosArgument.getLoadedBlockPos(context, "position"), null))
 												.then(
 													Commands.argument("dimension", DimensionArgument.dimension())		// sportals power add <amount> <x> <y> <z> [dimension]
-														.executes(context -> {
-															return power(context.getSource(), PowerMode.Add, IntegerArgumentType.getInteger(context, "amount"), BlockPosArgument.getLoadedBlockPos(context, "position"), DimensionArgument.getDimension(context, "dimension"));
-														})
+														.executes(context -> power(context.getSource(), PowerMode.Add, IntegerArgumentType.getInteger(context, "amount"), BlockPosArgument.getLoadedBlockPos(context, "position"), DimensionArgument.getDimension(context, "dimension")))
 												)
 										)
 								)
@@ -143,14 +126,10 @@ public class CommandPortals
 									Commands.argument("amount", IntegerArgumentType.integer(1))
 										.then(
 											Commands.argument("position", BlockPosArgument.blockPos())
-												.executes(context -> {
-													return power(context.getSource(), PowerMode.Remove, IntegerArgumentType.getInteger(context, "amount"), BlockPosArgument.getLoadedBlockPos(context, "position"), null);
-												})
+												.executes(context -> power(context.getSource(), PowerMode.Remove, IntegerArgumentType.getInteger(context, "amount"), BlockPosArgument.getLoadedBlockPos(context, "position"), null))
 												.then(
 													Commands.argument("dimension", DimensionArgument.dimension())		// sportals power remove <amount> <x> <y> <z> [dimension]
-														.executes(context -> {
-															return power(context.getSource(), PowerMode.Remove, IntegerArgumentType.getInteger(context, "amount"), BlockPosArgument.getLoadedBlockPos(context, "position"), DimensionArgument.getDimension(context, "dimension"));
-														})
+														.executes(context -> power(context.getSource(), PowerMode.Remove, IntegerArgumentType.getInteger(context, "amount"), BlockPosArgument.getLoadedBlockPos(context, "position"), DimensionArgument.getDimension(context, "dimension")))
 												)
 										)
 								)
@@ -159,14 +138,10 @@ public class CommandPortals
 							Commands.literal("get")
 								.then(
 									Commands.argument("position", BlockPosArgument.blockPos())
-										.executes(context -> {
-											return power(context.getSource(), PowerMode.Get, 0, BlockPosArgument.getLoadedBlockPos(context, "position"), null);
-										})
+										.executes(context -> power(context.getSource(), PowerMode.Get, 0, BlockPosArgument.getLoadedBlockPos(context, "position"), null))
 										.then(
 											Commands.argument("dimension", DimensionArgument.dimension())		// sportals power get <x> <y> <z> [dimension]
-												.executes(context -> {
-													return power(context.getSource(), PowerMode.Get, 0, BlockPosArgument.getLoadedBlockPos(context, "position"), DimensionArgument.getDimension(context, "dimension"));
-												})
+												.executes(context -> power(context.getSource(), PowerMode.Get, 0, BlockPosArgument.getLoadedBlockPos(context, "position"), DimensionArgument.getDimension(context, "dimension")))
 										)
 								)
 						)
@@ -208,9 +183,7 @@ public class CommandPortals
 						})
 						.then(
 							Commands.argument("player", EntityArgument.player())		// sportals cooldown <player>
-								.executes(context -> {
-									return cooldown(context.getSource(), EntityArgument.getPlayer(context, "player"));
-								})
+								.executes(context -> cooldown(context.getSource(), EntityArgument.getPlayer(context, "player")))
 						)
 				)
 				.then(
@@ -221,9 +194,7 @@ public class CommandPortals
 						})
 						.then(
 							Commands.literal("confirmed")		// sportals clear confirmed
-								.executes(context -> {
-									return clear(context.getSource());
-								})
+								.executes(context -> clear(context.getSource()))
 						)
 				)
 		);
@@ -264,7 +235,7 @@ public class CommandPortals
 
 			case Position:
 				// sportals deactivate <x> <y> <z> [dimension]
-				ResourceKey<Level> dimension = null;
+				ResourceKey<Level> dimension;
 
 				if (dimensionLevel == null)
 				{
@@ -373,7 +344,7 @@ public class CommandPortals
 	{
 		// sportals cooldown <player>
 		int cooldown = ((EntityAccessor)target).getPortalCooldown();
-		SendTranslatedMessage(source, "commands.sportals.cooldown.success", target.getName(), cooldown, cooldown / 20f);	// This assumes normal tickrate of 20 (TPS).
+		SendTranslatedMessage(source, "commands.sportals.cooldown.success", target.getName(), cooldown, cooldown / 20f);	// This assumes normal tick-rate of 20 (TPS).
 
 		return 1;
 	}

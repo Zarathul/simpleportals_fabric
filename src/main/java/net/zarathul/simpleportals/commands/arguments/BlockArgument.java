@@ -48,13 +48,13 @@ public class BlockArgument implements ArgumentType<Block>
 		int i = reader.getCursor();
 		ResourceLocation blockResourceLocation = ResourceLocation.read(reader);
 
-		if (!Registry.BLOCK.getOptional(blockResourceLocation).isPresent())
+		if (Registry.BLOCK.getOptional(blockResourceLocation).isEmpty())
 		{
 			reader.setCursor(i);
 			throw INVALID_ADDRESS.createWithContext(reader, blockResourceLocation);
 		}
 
-		suggestionFuture = (builder) -> builder.buildFuture();
+		suggestionFuture = SuggestionsBuilder::buildFuture;
 
 		return Registry.BLOCK.get(blockResourceLocation);
 	}
@@ -69,7 +69,7 @@ public class BlockArgument implements ArgumentType<Block>
 		{
 			parse(reader);
 		}
-		catch (CommandSyntaxException ex) {}
+		catch (CommandSyntaxException ignored) {}
 
 		return this.suggestionFuture.apply(builder.createOffset(reader.getCursor()));
 	}

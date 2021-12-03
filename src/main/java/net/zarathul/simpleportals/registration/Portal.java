@@ -232,7 +232,7 @@ public class Portal
 		{
 			List<BlockPos> framePositions = getFramePositions();
 			
-			BlockPos spawnLocation = null;
+			BlockPos spawnLocation;
 			
 			// Check for valid spawn positions on top of the frame blocks.
 			
@@ -308,7 +308,7 @@ public class Portal
 		
 		BlockPos portal1 = corner1.getInnerCornerPos();
 		BlockPos portal2 = corner4.getInnerCornerPos();
-		int width = 0, height = 0, lowBound = 0, highBound = 0;
+		int width, height, lowBound, highBound;
 		
 		// Get the axis for possible spawn locations and the corresponding 
 		// axis values for the 2 corner portal blocks.
@@ -338,7 +338,6 @@ public class Portal
 		Direction searchDirPositive = Direction.fromAxisAndDirection(cornerAxis, AxisDirection.POSITIVE);
 		Direction searchDirNegative = Direction.fromAxisAndDirection(cornerAxis, AxisDirection.NEGATIVE);
 		
-		BlockPos feetPos = null;
 		BlockPos searchStartPos1 = (axis == Axis.Z)
 			? new BlockPos(middle, startHeight, portal1.south(1).getZ())
 			: new BlockPos(portal1.east(1).getX(), startHeight, middle);
@@ -348,9 +347,10 @@ public class Portal
 			: new BlockPos(portal1.west(1).getX(), startHeight, middle);
 		
 		BlockPos[] searchStartPositions = new BlockPos[] { searchStartPos1, searchStartPos2 };
-		
+
+		BlockPos feetPos;
 		BlockPos currentFeetPos;
-		
+
 		// Find the lowest position where the entity can spawn at either side.
 		// Search order is south before north and east before west.
 		
@@ -525,7 +525,7 @@ public class Portal
 			if (other.corner4 != null) return false;
 		}
 		else if (!corner4.equals(other.corner4)) return false;
-		
+
 		return true;
 	}
 	
@@ -538,7 +538,7 @@ public class Portal
 	 * @param pos
 	 * The position of the lowest point (feet) of the entity.
 	 * @param entityHeight
-	 * The entities height.
+	 * The entities' height.
 	 * @return
 	 * <code>true</code> if the entity can spawn at the location, otherwise <code>false</code>.
 	 */

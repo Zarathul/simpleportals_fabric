@@ -13,5 +13,5 @@ public interface DirectionAccessor
 	static Map<String, Direction> getByNameMap()
 	{
 		throw new AssertionError();
-	};
+	}
 }

@@ -22,7 +22,7 @@
       "net.zarathul.simpleportals.SimplePortals"
     ],
     "client": [
-      "net.zarathul.simpleportals.ClienInit"
+      "net.zarathul.simpleportals.ClientInit"
     ]
   },
   "mixins": [

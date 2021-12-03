@@ -102,5 +102,6 @@
 	"config.dimension_header": "§nDimension",
 	"config.location_header": "§nStandort",
 	"config.address_header": "§nAdresse",
-	"config.power_header": "§nEnergie"
+	"config.power_header": "§nEnergie",
+	"config.missing_permission": "Du hast nicht die benötigten Rechte für diesen Befehl."
 }

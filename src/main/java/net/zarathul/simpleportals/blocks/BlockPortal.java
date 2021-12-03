@@ -42,7 +42,7 @@ import java.util.Random;
 import java.util.stream.Collectors;
 
 /**
- * Represents the actual portals in the center of the portal multiblock.
+ * Represents the actual portals in the center of the portal multi-block.
  */
 public class BlockPortal extends Block
 {
@@ -61,7 +61,7 @@ public class BlockPortal extends Block
 			.noDrops()
 			 .noCollission()
 			.strength(-1.0F) // indestructible by normal means
-			.lightLevel((state) -> { return 11; })
+			.lightLevel((state) -> 11)
 			.sound(SoundType.GLASS));
 	}
 
@@ -90,7 +90,7 @@ public class BlockPortal extends Block
 	public void entityInside(BlockState state, Level world, BlockPos pos, Entity entity)
 	{
 		if (!world.isClientSide() && entity.isAlive() && !entity.isPassenger() && !entity.isVehicle() && entity.canChangeDimensions() &&
-			Shapes.joinIsNotEmpty(Shapes.create(entity.getBoundingBox().move((double)(-pos.getX()), (double)(-pos.getY()), (double)(-pos.getZ()))), state.getShape(world, pos), BooleanOp.AND))
+			Shapes.joinIsNotEmpty(Shapes.create(entity.getBoundingBox().move(-pos.getX(), -pos.getY(), -pos.getZ())), state.getShape(world, pos), BooleanOp.AND))
 		{
 			// For players a configurable cooldown is used instead of the value provided by getPortalCooldown(), because
 			// that value is very small. A small value is fine for vanilla teleportation mechanics but can cause issues
@@ -214,7 +214,7 @@ public class BlockPortal extends Block
 						catch (InterruptedException ex)
 						{
 							SimplePortals.log.error("Failed to enqueue teleportation task for player '{}' to dimension '{}'.",
-													((ServerPlayer)entity).getName(),
+													entity.getName(),
 													destinationPortal.getDimension() != null);
 						}
 					}
@@ -285,17 +285,17 @@ public class BlockPortal extends Block
 				if (portalAxis == Axis.X)
 				{
 					d0 = (double)pos.getX() + 0.5D + 0.25D * (double)j;
-					d3 = (double)(random.nextFloat() * 2.0F * (float)j);
+					d3 = random.nextFloat() * 2.0F * (float)j;
 				}
 				else if (portalAxis == Axis.Y)
 				{
 					d1 = (double)pos.getY() + 0.5D + 0.25D * (double)j;
-					d4 = (double)(random.nextFloat() * 2.0F * (float)j);
+					d4 = random.nextFloat() * 2.0F * (float)j;
 				}
 				else
 				{
 					d2 = (double)pos.getZ() + 0.5D + 0.25D * (double)j;
-					d5 = (double)(random.nextFloat() * 2.0F * (float)j);
+					d5 = random.nextFloat() * 2.0F * (float)j;
 				}
 
 				world.addParticle(ParticleTypes.PORTAL, d0, d1, d2, d3, d4, d5);

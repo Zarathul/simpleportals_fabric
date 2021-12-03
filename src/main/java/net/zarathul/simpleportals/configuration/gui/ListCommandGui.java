@@ -4,17 +4,21 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractSelectionList;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.ImageButton;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
@@ -22,6 +26,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
+import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.common.Utils;
 
 import java.util.ArrayList;
@@ -43,6 +48,7 @@ public class ListCommandGui extends Screen
 	private static final int PADDING = 5;
 	private static final int BUTTON_HEIGHT = 20;
 	private static final int ADDRESS_ITEM_SIZE = 16;
+	private static final int GOTO_BUTTON_SIZE = 20;
 	private static final int WHITE = ChatFormatting.WHITE.getColor();
 	private static final TranslatableComponent dimensionHeader = new TranslatableComponent("config.dimension_header");
 	private static final TranslatableComponent locationHeader  = new TranslatableComponent("config.location_header");
@@ -125,12 +131,12 @@ public class ListCommandGui extends Screen
 		minecraft.font.draw(poseStack, title.getVisualOrderText(), PADDING, PADDING, WHITE);
 		minecraft.font.draw(poseStack, filterLabel.getVisualOrderText(), PADDING, titleHeight + 2 * PADDING + 6, WHITE);
 
-		int widthWithoutPadding = portalList.getRowWidth() - 6 * PADDING;
+		int widthWithoutPadding = portalList.getRowWidth() - 7 * PADDING;
 		int addressItemsWidth = 4 * ADDRESS_ITEM_SIZE + 3 * PADDING;
-		int totalBoxesWidth = widthWithoutPadding - addressItemsWidth;
-		int dimensionBoxWidth = (int)Math.floor((1.0f /  3.0f) * totalBoxesWidth);
-		int locationBoxWidth  = (int)Math.floor((1.0f /  3.0f) * totalBoxesWidth);
-		int addressBoxWidth   = (int)Math.floor((3.0f / 12.0f) * totalBoxesWidth);
+		int totalBoxesWidth = widthWithoutPadding - addressItemsWidth - (GOTO_BUTTON_SIZE + PADDING);
+		int dimensionBoxWidth = (int)Math.floor((4.0f / 12.0f) * totalBoxesWidth);
+		int locationBoxWidth  = (int)Math.floor((3.0f / 12.0f) * totalBoxesWidth);
+		int addressBoxWidth   = (int)Math.floor((4.0f / 12.0f) * totalBoxesWidth);
 
 		int xOffset = width - portalList.getRowWidth() - 2 * PADDING;
 		int yOffset = portalListY - minecraft.font.lineHeight - PADDING;
@@ -139,7 +145,7 @@ public class ListCommandGui extends Screen
 		xOffset += dimensionBoxWidth + PADDING;
 
 		minecraft.font.draw(poseStack, locationHeader.getVisualOrderText(), xOffset, yOffset, WHITE);
-		xOffset += locationBoxWidth + PADDING;
+		xOffset += locationBoxWidth + GOTO_BUTTON_SIZE + 2 * PADDING;
 
 		minecraft.font.draw(poseStack, addressHeader.getVisualOrderText(), xOffset, yOffset, WHITE);
 		xOffset += addressBoxWidth + addressItemsWidth + 2 * PADDING;
@@ -158,7 +164,7 @@ public class ListCommandGui extends Screen
 	public class PortalList extends AbstractSelectionList<PortalList.Entry>
 	{
 		private static final int LEFT_RIGHT_BORDER = 20;
-		private List<PortalInfo> portals;
+		private final List<PortalInfo> portals;
 
 		public PortalList(List<PortalInfo> portals, Filter filter, Minecraft mc, int width, int height, int top, int bottom, int itemHeight)
 		{
@@ -247,6 +253,7 @@ public class ListCommandGui extends Screen
 		{
 			private final EditBox dimensionBox;
 			private final EditBox locationBox;
+			private final ImageButton gotoLocationButton;
 			private final EditBox addressBox;
 			private final EditBox powerBox;
 			private final List<ItemStack> addressItems;
@@ -258,7 +265,7 @@ public class ListCommandGui extends Screen
 				dimensionBox = new EditBox(minecraft.font, 0, 0, 100, itemHeight - PADDING, TextComponent.EMPTY);
 				dimensionBox.setTextColor(WHITE);
 				dimensionBox.setMaxLength(256);
-				dimensionBox.setValue(portal.dimension.toString());
+				dimensionBox.setValue(portal.dimension.location().toString());
 				dimensionBox.moveCursorToStart();
 
 				locationBox = new EditBox(minecraft.font, 100 + PADDING, 0, 100, itemHeight - PADDING, TextComponent.EMPTY);
@@ -266,6 +273,16 @@ public class ListCommandGui extends Screen
 				locationBox.setMaxLength(48);
 				locationBox.setValue(Utils.getReadablyBlockPos(portal.location));
 				locationBox.moveCursorToStart();
+
+				gotoLocationButton = new ImageButton(0, 0, GOTO_BUTTON_SIZE, GOTO_BUTTON_SIZE, 0, 106, GOTO_BUTTON_SIZE, Button.WIDGETS_LOCATION, 256, 256, button -> {
+					minecraft.setScreen(null);
+
+					FriendlyByteBuf sendBuffer = PacketByteBufs.create();
+					sendBuffer.writeResourceLocation(portal.dimension.location());	// dimension
+					sendBuffer.writeBlockPos(portal.location);						// location
+
+					ClientPlayNetworking.send(SimplePortals.TPD_COMMAND_PACKET_ID, sendBuffer);
+				});
 
 				addressItems = new ArrayList<>(4);
 				countLabels = new FormattedCharSequence[4];
@@ -297,6 +314,7 @@ public class ListCommandGui extends Screen
 
 				addRenderableWidget(dimensionBox);
 				addRenderableWidget(locationBox);
+				addRenderableWidget(gotoLocationButton);
 				addRenderableWidget(addressBox);
 				addRenderableWidget(powerBox);
 			}
@@ -312,12 +330,12 @@ public class ListCommandGui extends Screen
 			@Override
 			public void render(PoseStack poseStack, int index, int top, int left, int width, int height, int mouseX, int mouseY, boolean isHot, float partialTicks)
 			{
-				int widthWithoutPadding = width - 6 * PADDING;
+				int widthWithoutPadding = width - 7 * PADDING;
 				int addressItemsWidth = 4 * ADDRESS_ITEM_SIZE + 3 * PADDING;
-				int totalBoxesWidth = widthWithoutPadding - addressItemsWidth;
-				int dimensionBoxWidth = (int)Math.floor((1.0f /  3.0f) * totalBoxesWidth);
-				int locationBoxWidth  = (int)Math.floor((1.0f /  3.0f) * totalBoxesWidth);
-				int addressBoxWidth   = (int)Math.floor((3.0f / 12.0f) * totalBoxesWidth);
+				int totalBoxesWidth = widthWithoutPadding - addressItemsWidth - (GOTO_BUTTON_SIZE + PADDING);
+				int dimensionBoxWidth = (int)Math.floor((4.0f / 12.0f) * totalBoxesWidth);
+				int locationBoxWidth  = (int)Math.floor((3.0f / 12.0f) * totalBoxesWidth);
+				int addressBoxWidth   = (int)Math.floor((4.0f / 12.0f) * totalBoxesWidth);
 				int powerBoxWidth     = (int)Math.floor((1.0f / 12.0f) * totalBoxesWidth);
 
 				int xOffset = left + PADDING;
@@ -336,6 +354,12 @@ public class ListCommandGui extends Screen
 				locationBox.render(poseStack, mouseX, mouseY, partialTicks);
 
 				xOffset += locationBoxWidth + PADDING;
+
+				gotoLocationButton.x = xOffset;
+				gotoLocationButton.y = top;
+				gotoLocationButton.render(poseStack, mouseX, mouseY, partialTicks);
+
+				xOffset += GOTO_BUTTON_SIZE + PADDING;
 
 				ItemRenderer itemRenderer = minecraft.getItemRenderer();
 
