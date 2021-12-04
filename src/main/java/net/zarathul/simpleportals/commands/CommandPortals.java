@@ -55,6 +55,14 @@ public class CommandPortals
 					return 1;
 				})
 				.then(
+					Commands.literal("config")	// Dummy so that the client side command shows up in auto-complete.
+						.executes(context -> 1)
+				)
+				.then(
+					Commands.literal("list")		// Dummy so that the client side command shows up in auto-complete.
+						.executes(context -> 1)
+				)
+				.then(
 					Commands.literal("deactivate")
 						.executes(context -> {
 							SendTranslatedMessage(context.getSource(), "commands.sportals.deactivate.info");

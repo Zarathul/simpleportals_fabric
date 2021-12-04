@@ -16,4 +16,7 @@ public interface EntityAccessor
 
 	@Invoker("removeAfterChangingDimensions")
 	void invokeRemoveAfterChangingDimensions();
+
+	@Invoker("unsetRemoved")
+	void invokeUnsetRemoved();
 }

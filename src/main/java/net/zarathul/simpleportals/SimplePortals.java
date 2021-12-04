@@ -212,6 +212,12 @@ public class SimplePortals implements ModInitializer
 				}
 				case SetServerSettings ->
 				{
+					if (!player.hasPermissions(4))
+					{
+						player.sendMessage(new TranslatableComponent("missing_permission"), ChatType.SYSTEM, UUID.randomUUID());
+						return;
+					}
+
 					Config.readServerSettings(Settings.class, receiveBuffer, player);
 					Config.save(MOD_ID, Settings.class);
 				}

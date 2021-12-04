@@ -10,10 +10,12 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.TicketType;
 import net.minecraft.server.players.PlayerList;
 import net.minecraft.util.Mth;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.BiomeManager;
 import net.minecraft.world.level.block.state.BlockState;
@@ -171,11 +173,9 @@ public final class Utils
 			}
 			else
 			{
-				player.connection.teleport(destination.getX() + 0.5d,
-										   destination.getY(),
-										   destination.getZ() + 0.5d,
-										   getYaw(facing),
-										   0.0f);
+				ChunkPos chunkPos = new ChunkPos(destination);
+				((ServerLevel)entity.level).getChunkSource().addRegionTicket(TicketType.POST_TELEPORT, chunkPos, 1, entity.getId());
+				((ServerPlayer)entity).connection.teleport(destination.getX() + 0.5d, destination.getY(), destination.getZ() + 0.5d, getYaw(facing), 0.0f);
 			}
 
 			// Play teleportation sound.
@@ -200,6 +200,9 @@ public final class Utils
 		return entity;
 	}
 
+	/**
+	 * Generic version of {@link ServerPlayer#changeDimension(ServerLevel)} without the hardcoded stuff.
+	 */
 	private static void teleportPlayerToDimension(ServerPlayer player, ResourceKey<Level> dimensionKey, BlockPos destination, float yaw, float pitch)
 	{
 		// Setting this flag circumvents at least a part of the shitty speed hack checks in
@@ -221,7 +224,7 @@ public final class Utils
 		PlayerList playerList = player.server.getPlayerList();
 		playerList.sendPlayerPermissionLevel(player);
 		originDimension.removePlayerImmediately(player, Entity.RemovalReason.CHANGED_DIMENSION);
-		// player.remove(Entity.RemovalReason.CHANGED_DIMENSION); FIXME: No longer needed ?
+		((EntityAccessor)player).invokeUnsetRemoved();
 
 		player.setLevel(destinationDimension);
 		destinationDimension.addDuringPortalTeleport(player);
@@ -229,10 +232,8 @@ public final class Utils
 		player.setYRot(yaw);
 		player.setXRot(pitch);
 		player.moveTo(destination.getX() + 0.5d, destination.getY(), destination.getZ() + 0.5d);
-
 		player.setDeltaMovement(Vec3.ZERO);
 
-		player.gameMode.setLevel(destinationDimension);
 		player.connection.send(new ClientboundPlayerAbilitiesPacket(player.getAbilities()));
 		playerList.sendLevelInfo(player, destinationDimension);
 		playerList.sendAllPlayerInfo(player);
@@ -267,39 +268,31 @@ public final class Utils
 	 */
 	private static Entity teleportNonPlayerEntityToDimension(Entity entity, ResourceKey<Level> dimensionKey, BlockPos destination, float yaw)
 	{
-		if (entity.level instanceof ServerLevel && !entity.isRemoved())
-		{
-			MinecraftServer server = entity.getServer();
-			if (server == null)	return entity;
+		if (!(entity.level instanceof ServerLevel) || entity.isRemoved()) return entity;
 
-			ServerLevel destinationWorld = server.getLevel(dimensionKey);
-			if (destinationWorld == null) return entity;
+		MinecraftServer server = entity.getServer();
+		if (server == null)	return entity;
 
-			ServerLevel originWorld = (ServerLevel)entity.level;
+		ServerLevel destinationWorld = server.getLevel(dimensionKey);
+		if (destinationWorld == null) return entity;
 
-			entity.unRide();
-			Entity newEntity = entity.getType().create(destinationWorld);
+		entity.unRide();
+		Entity newEntity = entity.getType().create(destinationWorld);
+		if (newEntity == null) return entity;
 
-			if (newEntity != null)
-			{
-				newEntity.restoreFrom(entity);
-				newEntity.moveTo(destination.getX(), destination.getY(), destination.getZ(), yaw, newEntity.getXRot());
-				newEntity.setDeltaMovement(Vec3.ZERO);
-				//destinationWorld.addFromAnotherDimension(newEntity); FIXME: remove
-				destinationWorld.addDuringTeleport(newEntity);
-			}
+		newEntity.restoreFrom(entity);
+		newEntity.moveTo(destination.getX(), destination.getY(), destination.getZ(), yaw, newEntity.getXRot());
+		// This mixin might be overkill, since all this method does 99.9% of the time is setting Entity.removed
+		// to true, but who knows what other peoples mods do. Better safe than sorry I guess.
+		((EntityAccessor)entity).invokeRemoveAfterChangingDimensions();
+		destinationWorld.addDuringTeleport(newEntity);
+		newEntity.setDeltaMovement(Vec3.ZERO);
+		newEntity.setOnGround(true);
 
-			// This mixin might be overkill, since all this method does 99.9% of the time is setting Entity.removed
-			// to true, but who knows what other peoples mods do. Better safe than sorry I guess.
-			((EntityAccessor)entity).invokeRemoveAfterChangingDimensions();
+		((ServerLevel)entity.level).resetEmptyTime();
+		destinationWorld.resetEmptyTime();
 
-			originWorld.resetEmptyTime();
-			destinationWorld.resetEmptyTime();
-
-			return (newEntity != null) ? newEntity : entity;
-		}
-
-		return entity;
+		return newEntity;
 	}
 
 	/**

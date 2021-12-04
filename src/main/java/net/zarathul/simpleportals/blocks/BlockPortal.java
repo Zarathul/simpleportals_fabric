@@ -215,7 +215,7 @@ public class BlockPortal extends Block
 						{
 							SimplePortals.log.error("Failed to enqueue teleportation task for player '{}' to dimension '{}'.",
 													entity.getName(),
-													destinationPortal.getDimension() != null);
+													destinationPortal.getDimension());
 						}
 					}
 					else

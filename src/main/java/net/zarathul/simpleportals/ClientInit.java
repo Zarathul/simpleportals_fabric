@@ -1,15 +1,11 @@
 package net.zarathul.simpleportals;
 
-import com.mojang.brigadier.tree.CommandNode;
-import com.mojang.brigadier.tree.LiteralCommandNode;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;
+import net.fabricmc.fabric.api.client.command.v1.ClientCommandManager;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.commands.Commands;
 import net.minecraft.core.Registry;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.TextComponent;
@@ -31,55 +27,41 @@ public class ClientInit implements ClientModInitializer
 	{
 		BlockRenderLayerMap.INSTANCE.putBlock(SimplePortals.blockPortal, RenderType.translucent());
 
-		// Register client side only command to show the config in the command tree (/sportals config).
-		// TODO: check behavior with dedicated server
+		// Register client side only commands.
+		ClientCommandManager.DISPATCHER.register(
+			ClientCommandManager.literal("sportals")
+				.then(
+					ClientCommandManager.literal("config")	// sportals config
+						.executes(context -> {
+							FriendlyByteBuf sendBuffer = PacketByteBufs.create();
+							sendBuffer.writeEnum(ConfigCommandMode.GetServerSettings);
 
-		CommandRegistrationCallback.EVENT.register((dispatcher, isDedicatedServer) -> {
-			if (isDedicatedServer) return;
+							ClientPlayNetworking.send(SimplePortals.CONFIG_COMMAND_PACKET_ID, sendBuffer);
 
-			// config command
-			LiteralCommandNode<CommandSourceStack> configCommand = Commands
-					.literal("config")		// sportals config
-					.executes(context -> {
-						FriendlyByteBuf sendBuffer = PacketByteBufs.create();
-						sendBuffer.writeEnum(ConfigCommandMode.GetServerSettings);
+							return 1;
+						})
+				)
+				.then(
+					ClientCommandManager.literal("list")
+						.requires(commandSource -> commandSource.hasPermission(4))
+						.executes(context -> {
+							ClientPlayNetworking.send(SimplePortals.LIST_COMMAND_PACKET_ID, PacketByteBufs.empty());
 
-						ClientPlayNetworking.send(SimplePortals.CONFIG_COMMAND_PACKET_ID, sendBuffer);
+							return 1;
+						})
+				)
+		);
 
-						return 1;
-					})
-					.build();
+		// Receiver for server side settings if a config command was issued.
+		ClientPlayNetworking.registerGlobalReceiver(SimplePortals.CONFIG_COMMAND_PACKET_ID, (minecraft, packetListener, receiveBuffer, sender) -> {
+			Config.readServerSettings(Settings.class, receiveBuffer, minecraft.player);
 
-			ArrayList<String> commandNodePath = new ArrayList<>();
-			commandNodePath.add("sportals");
-			CommandNode<CommandSourceStack> commandRoot = dispatcher.findNode(commandNodePath);
-
-			commandRoot.addChild(configCommand);
-
-			// Receiver for server side settings if a config command was issued.
-			ClientPlayNetworking.registerGlobalReceiver(SimplePortals.CONFIG_COMMAND_PACKET_ID, (minecraft, packetListener, receiveBuffer, sender) -> {
-				Config.readServerSettings(Settings.class, receiveBuffer, minecraft.player);
-
-				minecraft.execute(() -> minecraft.setScreen(new ConfigGui(new TextComponent("§nSimplePortals"), Settings.class, SimplePortals.MOD_ID, minecraft.player, player -> {
-					FriendlyByteBuf sendBuffer = PacketByteBufs.create();
-					sendBuffer.writeEnum(ConfigCommandMode.SetServerSettings);
-					Config.writeServerSettings(Settings.class, sendBuffer, player);
-					ClientPlayNetworking.send(SimplePortals.CONFIG_COMMAND_PACKET_ID, sendBuffer);
-				})));
-			});
-
-			// list command
-			LiteralCommandNode<CommandSourceStack> listCommand = Commands
-					.literal("list")		// sportals list
-					.requires(commandSource -> commandSource.hasPermission(4))
-					.executes(context -> {
-						ClientPlayNetworking.send(SimplePortals.LIST_COMMAND_PACKET_ID, PacketByteBufs.empty());
-
-						return 1;
-					})
-					.build();
-
-			commandRoot.addChild(listCommand);
+			minecraft.execute(() -> minecraft.setScreen(new ConfigGui(new TextComponent("§nSimplePortals"), Settings.class, SimplePortals.MOD_ID, minecraft.player, player -> {
+				FriendlyByteBuf sendBuffer = PacketByteBufs.create();
+				sendBuffer.writeEnum(ConfigCommandMode.SetServerSettings);
+				Config.writeServerSettings(Settings.class, sendBuffer, player);
+				ClientPlayNetworking.send(SimplePortals.CONFIG_COMMAND_PACKET_ID, sendBuffer);
+			})));
 		});
 
 		// Receiver for portal data from the server if a list command was issued.
