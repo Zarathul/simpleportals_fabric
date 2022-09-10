@@ -218,7 +218,7 @@ public final class Utils
 		ServerLevel originDimension = player.getLevel();
 		LevelData levelData = destinationDimension.getLevelData();
 
-		player.connection.send(new ClientboundRespawnPacket(destinationDimension.dimensionType(), destinationDimension.dimension(), BiomeManager.obfuscateSeed(destinationDimension.getSeed()), player.gameMode.getGameModeForPlayer(), player.gameMode.getPreviousGameModeForPlayer(), destinationDimension.isDebug(), destinationDimension.isFlat(), true));
+		player.connection.send(new ClientboundRespawnPacket(destinationDimension.dimensionTypeRegistration(), destinationDimension.dimension(), BiomeManager.obfuscateSeed(destinationDimension.getSeed()), player.gameMode.getGameModeForPlayer(), player.gameMode.getPreviousGameModeForPlayer(), destinationDimension.isDebug(), destinationDimension.isFlat(), true));
 		player.connection.send(new ClientboundChangeDifficultyPacket(levelData.getDifficulty(), levelData.isDifficultyLocked()));
 
 		PlayerList playerList = player.server.getPlayerList();

@@ -33,23 +33,23 @@ public class CommandTeleport
 			})
 			.then(
 				Commands.argument("dimension", DimensionArgument.dimension())
-					.executes(context -> tp(context.getSource(), TeleportMode.ToPosition, DimensionArgument.getDimension(context, "dimension"), null, null, null))
+				.executes(context -> tp(context.getSource(), TeleportMode.ToPosition, DimensionArgument.getDimension(context, "dimension"), null, null, null))
+				.then(
+					Commands.argument("position", BlockPosArgument.blockPos())
+					.executes(context -> tp(context.getSource(), TeleportMode.ToPosition, DimensionArgument.getDimension(context, "dimension"), BlockPosArgument.getLoadedBlockPos(context, "position"), null, null))
 					.then(
-						Commands.argument("position", BlockPosArgument.blockPos())
-							.executes(context -> tp(context.getSource(), TeleportMode.ToPosition, DimensionArgument.getDimension(context, "dimension"), BlockPosArgument.getLoadedBlockPos(context, "position"), null, null))
-							.then(
-								Commands.argument("player", EntityArgument.player())		// tpd <dimension> [<x> <y> <z>] [player]
-									.executes(context -> tp(context.getSource(), TeleportMode.ToPosition, DimensionArgument.getDimension(context, "dimension"), BlockPosArgument.getLoadedBlockPos(context, "position"), null, EntityArgument.getPlayer(context, "player")))
-							)
+						Commands.argument("player", EntityArgument.player())		// tpd <dimension> [<x> <y> <z>] [player]
+						.executes(context -> tp(context.getSource(), TeleportMode.ToPosition, DimensionArgument.getDimension(context, "dimension"), BlockPosArgument.getLoadedBlockPos(context, "position"), null, EntityArgument.getPlayer(context, "player")))
 					)
+				)
 			)
 			.then(
 				Commands.argument("targetPlayer", EntityArgument.player())
-					.executes(context -> tp(context.getSource(), TeleportMode.ToPlayer, null, null, EntityArgument.getPlayer(context, "targetPlayer"), null))
-					.then(
-						Commands.argument("player", EntityArgument.player())		// tpd <targetPlayer> [player]
-							.executes(context -> tp(context.getSource(), TeleportMode.ToPlayer, null, null, EntityArgument.getPlayer(context, "targetPlayer"), EntityArgument.getPlayer(context, "player")))
-					)
+				.executes(context -> tp(context.getSource(), TeleportMode.ToPlayer, null, null, EntityArgument.getPlayer(context, "targetPlayer"), null))
+				.then(
+					Commands.argument("player", EntityArgument.player())		// tpd <targetPlayer> [player]
+					.executes(context -> tp(context.getSource(), TeleportMode.ToPlayer, null, null, EntityArgument.getPlayer(context, "targetPlayer"), EntityArgument.getPlayer(context, "player")))
+				)
 			)
 		);
 	}

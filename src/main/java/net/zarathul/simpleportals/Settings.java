@@ -1,9 +1,8 @@
 package net.zarathul.simpleportals;
 
+import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.tags.ItemTags;
-import net.minecraft.tags.Tag;
-import net.minecraft.tags.TagCollection;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.zarathul.simpleportals.configuration.ConfigSetting;
 
@@ -66,14 +65,24 @@ public final class Settings
 		// Without the tag list there is no way to check if a ResourceLocation is valid, so accept them all.
 		// Without doing this, a value for powerSource could never be loaded from the config file, because
 		// it would always be invalid.
-		TagCollection<Item> tags = ItemTags.getAllTags();
-		if ((tags == null) || (tags.getAllTags().size() == 0)) return true;
+		if (Registry.ITEM.getTagNames().findAny().isEmpty()) return true;
 
 		// Check if the passed ResourceLocation corresponds to a valid tag and cache the result for later use.
-		powerSourceTag = tags.getTag(value);
-		return (powerSourceTag != null);
+		// Note: Registry.ITEM.getTag() doesn't find anything with a new'd TagKey as an argument, that's why
+		// the registry is searched manually here.
+		var searchResult = Registry.ITEM.getTagNames().filter(name -> {
+			return (name.location().equals(value));
+		}).findAny();
+
+		if (searchResult.isPresent())
+		{
+			powerSourceTag = searchResult.get();
+			return true;
+		}
+
+		return false;
 	}
-	public static Tag<Item> powerSourceTag;
+	public static TagKey<Item> powerSourceTag;
 
 	@ConfigSetting(descriptionKey = "particles_enabled", description = "If enabled, portals emit particles (visual effect).", category = "client", clientOnly = true)
 	public static boolean particlesEnabled;

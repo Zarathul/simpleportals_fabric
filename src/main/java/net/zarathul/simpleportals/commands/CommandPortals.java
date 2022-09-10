@@ -10,13 +10,11 @@ import net.minecraft.commands.arguments.DimensionArgument;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Registry;
 import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.tags.ItemTags;
-import net.minecraft.tags.Tag;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
 import net.zarathul.simpleportals.Settings;
 import net.zarathul.simpleportals.commands.arguments.BlockArgument;
@@ -25,7 +23,6 @@ import net.zarathul.simpleportals.registration.Address;
 import net.zarathul.simpleportals.registration.Portal;
 import net.zarathul.simpleportals.registration.PortalRegistry;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -47,164 +44,156 @@ public class CommandPortals
 
 	public static void register(CommandDispatcher<CommandSourceStack> dispatcher)
 	{
+		// As of 1.18.2 because the config and list subcommands are client-side only, the whole command tree has to be mirrored in ClientInit.
+
 		dispatcher.register(
-			Commands.literal("sportals")
-				.requires((commandSource) -> commandSource.hasPermission(4))
+			Commands.literal("sportals").requires((commandSource) -> commandSource.hasPermission(4))
+			.executes(context -> {
+				SendTranslatedMessage(context.getSource(), "commands.sportals.info");
+				return 1;
+			})
+			.then(
+				Commands.literal("config")	// Dummy so that the client side command shows up in auto-complete.
+				.executes(context -> 1)
+			)
+			.then(
+				Commands.literal("list")		// Dummy so that the client side command shows up in auto-complete.
+				.executes(context -> 1)
+			)
+			.then(
+				Commands.literal("deactivate")
 				.executes(context -> {
-					SendTranslatedMessage(context.getSource(), "commands.sportals.info");
+					SendTranslatedMessage(context.getSource(), "commands.sportals.deactivate.info");
 					return 1;
 				})
 				.then(
-					Commands.literal("config")	// Dummy so that the client side command shows up in auto-complete.
-						.executes(context -> 1)
-				)
-				.then(
-					Commands.literal("list")		// Dummy so that the client side command shows up in auto-complete.
-						.executes(context -> 1)
-				)
-				.then(
-					Commands.literal("deactivate")
-						.executes(context -> {
-							SendTranslatedMessage(context.getSource(), "commands.sportals.deactivate.info");
-							return 1;
-						})
+					Commands.argument("address1", BlockArgument.block())
+					.then(
+						Commands.argument("address2", BlockArgument.block())
 						.then(
-							Commands.argument("address1", BlockArgument.block())
+							Commands.argument("address3", BlockArgument.block())
+							.then(
+								Commands.argument("address4", BlockArgument.block())
+								.executes(context -> {
+									Address address = new Address(PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address1")),
+										PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address2")),
+										PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address3")),
+										PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address4")));
+
+									return deactivate(context.getSource(), DeactivateMode.Address, address, null, null);
+								})
 								.then(
-									Commands.argument("address2", BlockArgument.block())
-										.then(
-											Commands.argument("address3", BlockArgument.block())
-												.then(
-													Commands.argument("address4", BlockArgument.block())
-														.executes(context -> {
-															Address address = new Address(PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address1")),
-																	PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address2")),
-																	PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address3")),
-																	PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address4")));
+									Commands.argument("dimension", DimensionArgument.dimension())		// sportals deactivate <addressBlockId> <addressBlockId> <addressBlockId> <addressBlockId> [dimension]
+									.executes(context -> {
+										Address address = new Address(PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address1")),
+											PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address2")),
+											PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address3")),
+											PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address4")));
 
-															return deactivate(context.getSource(), DeactivateMode.Address, address, null, null);
-														})
-														.then(
-															Commands.argument("dimension", DimensionArgument.dimension())		// sportals deactivate <addressBlockId> <addressBlockId> <addressBlockId> <addressBlockId> [dimension]
-																.executes(context -> {
-																	Address address = new Address(PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address1")),
-																			PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address2")),
-																			PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address3")),
-																			PortalRegistry.getAddressBlockId(BlockArgument.getBlock(context, "address4")));
-
-																	return deactivate(context.getSource(), DeactivateMode.Address, address, null, DimensionArgument.getDimension(context, "dimension"));
-																})
-														)
-												)
-										)
+										return deactivate(context.getSource(), DeactivateMode.Address, address, null, DimensionArgument.getDimension(context, "dimension"));
+									})
 								)
+							)
 						)
+					)
+				)
+				.then(
+					Commands.argument("position", BlockPosArgument.blockPos())
+					.executes(context -> deactivate(context.getSource(), DeactivateMode.Position, null, BlockPosArgument.getLoadedBlockPos(context, "position"), null))
+					.then(
+						Commands.argument("dimension", DimensionArgument.dimension())		// sportals deactivate <x> <y> <z> [dimension]
+						.executes(context -> deactivate(context.getSource(), DeactivateMode.Position, null, BlockPosArgument.getLoadedBlockPos(context, "position"), DimensionArgument.getDimension(context, "dimension")))
+					)
+				)
+			)
+			.then(
+				Commands.literal("power")
+				.executes(context -> {
+					SendTranslatedMessage(context.getSource(), "commands.sportals.power.info");
+					return 1;
+				})
+				.then(
+					Commands.literal("add")
+					.then(
+						Commands.argument("amount", IntegerArgumentType.integer(1))
 						.then(
 							Commands.argument("position", BlockPosArgument.blockPos())
-								.executes(context -> deactivate(context.getSource(), DeactivateMode.Position, null, BlockPosArgument.getLoadedBlockPos(context, "position"), null))
-								.then(
-									Commands.argument("dimension", DimensionArgument.dimension())		// sportals deactivate <x> <y> <z> [dimension]
-										.executes(context -> deactivate(context.getSource(), DeactivateMode.Position, null, BlockPosArgument.getLoadedBlockPos(context, "position"), DimensionArgument.getDimension(context, "dimension")))
-								)
+							.executes(context -> power(context.getSource(), PowerMode.Add, IntegerArgumentType.getInteger(context, "amount"), BlockPosArgument.getLoadedBlockPos(context, "position"), null))
+							.then(
+								Commands.argument("dimension", DimensionArgument.dimension())		// sportals power add <amount> <x> <y> <z> [dimension]
+								.executes(context -> power(context.getSource(), PowerMode.Add, IntegerArgumentType.getInteger(context, "amount"), BlockPosArgument.getLoadedBlockPos(context, "position"), DimensionArgument.getDimension(context, "dimension")))
+							)
 						)
+					)
 				)
 				.then(
-					Commands.literal("power")
-						.executes(context -> {
-							SendTranslatedMessage(context.getSource(), "commands.sportals.power.info");
-							return 1;
-						})
+					Commands.literal("remove")
+					.then(
+						Commands.argument("amount", IntegerArgumentType.integer(1))
 						.then(
-							Commands.literal("add")
-								.then(
-									Commands.argument("amount", IntegerArgumentType.integer(1))
-										.then(
-											Commands.argument("position", BlockPosArgument.blockPos())
-												.executes(context -> power(context.getSource(), PowerMode.Add, IntegerArgumentType.getInteger(context, "amount"), BlockPosArgument.getLoadedBlockPos(context, "position"), null))
-												.then(
-													Commands.argument("dimension", DimensionArgument.dimension())		// sportals power add <amount> <x> <y> <z> [dimension]
-														.executes(context -> power(context.getSource(), PowerMode.Add, IntegerArgumentType.getInteger(context, "amount"), BlockPosArgument.getLoadedBlockPos(context, "position"), DimensionArgument.getDimension(context, "dimension")))
-												)
-										)
-								)
+							Commands.argument("position", BlockPosArgument.blockPos())
+							.executes(context -> power(context.getSource(), PowerMode.Remove, IntegerArgumentType.getInteger(context, "amount"), BlockPosArgument.getLoadedBlockPos(context, "position"), null))
+							.then(
+								Commands.argument("dimension", DimensionArgument.dimension())		// sportals power remove <amount> <x> <y> <z> [dimension]
+								.executes(context -> power(context.getSource(), PowerMode.Remove, IntegerArgumentType.getInteger(context, "amount"), BlockPosArgument.getLoadedBlockPos(context, "position"), DimensionArgument.getDimension(context, "dimension")))
+							)
 						)
-						.then(
-							Commands.literal("remove")
-								.then(
-									Commands.argument("amount", IntegerArgumentType.integer(1))
-										.then(
-											Commands.argument("position", BlockPosArgument.blockPos())
-												.executes(context -> power(context.getSource(), PowerMode.Remove, IntegerArgumentType.getInteger(context, "amount"), BlockPosArgument.getLoadedBlockPos(context, "position"), null))
-												.then(
-													Commands.argument("dimension", DimensionArgument.dimension())		// sportals power remove <amount> <x> <y> <z> [dimension]
-														.executes(context -> power(context.getSource(), PowerMode.Remove, IntegerArgumentType.getInteger(context, "amount"), BlockPosArgument.getLoadedBlockPos(context, "position"), DimensionArgument.getDimension(context, "dimension")))
-												)
-										)
-								)
-						)
-						.then(
-							Commands.literal("get")
-								.then(
-									Commands.argument("position", BlockPosArgument.blockPos())
-										.executes(context -> power(context.getSource(), PowerMode.Get, 0, BlockPosArgument.getLoadedBlockPos(context, "position"), null))
-										.then(
-											Commands.argument("dimension", DimensionArgument.dimension())		// sportals power get <x> <y> <z> [dimension]
-												.executes(context -> power(context.getSource(), PowerMode.Get, 0, BlockPosArgument.getLoadedBlockPos(context, "position"), DimensionArgument.getDimension(context, "dimension")))
-										)
-								)
-						)
-						.then(
-							Commands.literal("items")
-								.executes(context -> {
-									Tag<Item> powerTag = ItemTags.getAllTags().getTag(Settings.powerSource);
-
-									if (powerTag == null)
-									{
-										SendTranslatedMessage(context.getSource(), "commands.errors.no_power_items", Settings.powerSource);
-										return 1;
-									}
-
-									Collection<Item> itemsWithPowerTag = powerTag.getValues();
-
-									if (itemsWithPowerTag.size() == 0)
-									{
-										SendTranslatedMessage(context.getSource(), "commands.errors.no_power_items", Settings.powerSource);
-										return 1;
-									}
-
-									SendTranslatedMessage(context.getSource(), "commands.sportals.power.items.success", itemsWithPowerTag.size());
-
-									for (Item powerSource : itemsWithPowerTag)
-									{
-										SendTranslatedMessage(context.getSource(), powerSource.getDescriptionId());
-									}
-
-									return 1;
-								})
-						)
+					)
 				)
 				.then(
-					Commands.literal("cooldown")
-						.executes(context -> {
-							SendTranslatedMessage(context.getSource(), "commands.sportals.cooldown.info");
-							return 1;
-						})
+					Commands.literal("get")
+					.then(
+						Commands.argument("position", BlockPosArgument.blockPos())
+						.executes(context -> power(context.getSource(), PowerMode.Get, 0, BlockPosArgument.getLoadedBlockPos(context, "position"), null))
 						.then(
-							Commands.argument("player", EntityArgument.player())		// sportals cooldown <player>
-								.executes(context -> cooldown(context.getSource(), EntityArgument.getPlayer(context, "player")))
+							Commands.argument("dimension", DimensionArgument.dimension())		// sportals power get <x> <y> <z> [dimension]
+							.executes(context -> power(context.getSource(), PowerMode.Get, 0, BlockPosArgument.getLoadedBlockPos(context, "position"), DimensionArgument.getDimension(context, "dimension")))
 						)
+					)
 				)
 				.then(
-					Commands.literal("clear")
-						.executes(context -> {
-							SendTranslatedMessage(context.getSource(), "commands.sportals.clear.info");
+					Commands.literal("items")
+					.executes(context -> {
+						var powerTag = Registry.ITEM.getTag(Settings.powerSourceTag);
+
+						if (powerTag.isEmpty())
+						{
+							SendTranslatedMessage(context.getSource(), "commands.errors.no_power_items", Settings.powerSource);
 							return 1;
-						})
-						.then(
-							Commands.literal("confirmed")		// sportals clear confirmed
-								.executes(context -> clear(context.getSource()))
-						)
+						}
+
+						SendTranslatedMessage(context.getSource(), "commands.sportals.power.items.success", powerTag.get().stream().count());
+
+						powerTag.get().forEach(item -> {
+							SendTranslatedMessage(context.getSource(), item.value().getDescriptionId());
+						});
+
+						return 1;
+					})
 				)
+			)
+			.then(
+				Commands.literal("cooldown")
+				.executes(context -> {
+					SendTranslatedMessage(context.getSource(), "commands.sportals.cooldown.info");
+					return 1;
+				})
+				.then(
+					Commands.argument("player", EntityArgument.player())		// sportals cooldown <player>
+					.executes(context -> cooldown(context.getSource(), EntityArgument.getPlayer(context, "player")))
+				)
+			)
+			.then(
+				Commands.literal("clear")
+				.executes(context -> {
+					SendTranslatedMessage(context.getSource(), "commands.sportals.clear.info");
+					return 1;
+				})
+				.then(
+					Commands.literal("confirmed")		// sportals clear confirmed
+					.executes(context -> clear(context.getSource()))
+				)
+			)
 		);
 	}
 
