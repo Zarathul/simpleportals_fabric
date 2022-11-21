@@ -10,7 +10,7 @@ import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.zarathul.simpleportals.common.Utils;
@@ -64,7 +64,7 @@ public class CommandTeleport
 			}
 			catch (CommandSyntaxException ex)
 			{
-				throw new CommandRuntimeException(new TranslatableComponent("commands.errors.unknown_sender"));
+				throw new CommandRuntimeException(Component.translatable("commands.errors.unknown_sender"));
 			}
 		}
 
@@ -89,6 +89,6 @@ public class CommandTeleport
 
 	private static void SendTranslatedMessage(CommandSourceStack source, String message, Object... args)
 	{
-		source.sendSuccess(new TranslatableComponent(message, args), false);
+		source.sendSuccess(Component.translatable(message, args), false);
 	}
 }

@@ -19,9 +19,8 @@ import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemStack;
@@ -50,10 +49,10 @@ public class ListCommandGui extends Screen
 	private static final int ADDRESS_ITEM_SIZE = 16;
 	private static final int GOTO_BUTTON_SIZE = 20;
 	private static final int WHITE = ChatFormatting.WHITE.getColor();
-	private static final TranslatableComponent dimensionHeader = new TranslatableComponent("config.dimension_header");
-	private static final TranslatableComponent locationHeader  = new TranslatableComponent("config.location_header");
-	private static final TranslatableComponent addressHeader   = new TranslatableComponent("config.address_header");
-	private static final TranslatableComponent powerHeader     = new TranslatableComponent("config.power_header");
+	private static final Component dimensionHeader = Component.translatable("config.dimension_header");
+	private static final Component locationHeader  = Component.translatable("config.location_header");
+	private static final Component addressHeader   = Component.translatable("config.address_header");
+	private static final Component powerHeader     = Component.translatable("config.power_header");
 
 	public ListCommandGui(List<PortalInfo> portals)
 	{
@@ -62,9 +61,9 @@ public class ListCommandGui extends Screen
 
 	public ListCommandGui(List<PortalInfo> portals, Filter filter)
 	{
-		super(new TranslatableComponent("config.portal_list_header"));
+		super(Component.translatable("config.portal_list_header"));
 
-		filterLabel = new TranslatableComponent("config.filter_by");
+		filterLabel = Component.translatable("config.filter_by");
 
 		this.portals = portals;
 		this.filter = filter;
@@ -81,7 +80,7 @@ public class ListCommandGui extends Screen
 		portalList = new PortalList(portals, filter, minecraft, width, height, portalListY, height - PADDING, 26);
 		addRenderableWidget(portalList);
 
-		addRenderableWidget(new Button(width - 60 - PADDING, 0, 60, BUTTON_HEIGHT, new TranslatableComponent("config.back"), button -> minecraft.setScreen(null)));
+		addRenderableWidget(new Button(width - 60 - PADDING, 0, 60, BUTTON_HEIGHT, Component.translatable("config.back"), button -> minecraft.setScreen(null)));
 
 		int xOffset = filterLabelWidth + PADDING;
 		filterTypeButton = new EnumOptionButton<>(Filter.Type.class, "", xOffset, paddedTitleHeight, 80, BUTTON_HEIGHT);
@@ -96,7 +95,7 @@ public class ListCommandGui extends Screen
 
 		int applyButtonWidth = 60;
 		int filterBoxWidth = width - xOffset - 2 * PADDING - applyButtonWidth;
-		filterValueBox = new EditBox(minecraft.font, xOffset, paddedTitleHeight, filterBoxWidth, BUTTON_HEIGHT, TextComponent.EMPTY);
+		filterValueBox = new EditBox(minecraft.font, xOffset, paddedTitleHeight, filterBoxWidth, BUTTON_HEIGHT, CommonComponents.EMPTY);
 		filterValueBox.setMaxLength(256);
 		if (filter.value != null)
 		{
@@ -112,7 +111,7 @@ public class ListCommandGui extends Screen
 		addRenderableWidget(filterValueBox);
 		xOffset += filterBoxWidth + PADDING;
 
-		addRenderableWidget(new Button(xOffset, paddedTitleHeight + 1, applyButtonWidth, BUTTON_HEIGHT, new TranslatableComponent("config.apply"), button -> {
+		addRenderableWidget(new Button(xOffset, paddedTitleHeight + 1, applyButtonWidth, BUTTON_HEIGHT, Component.translatable("config.apply"), button -> {
 			String valueText = filterValueBox.getValue();
 			Object value = (filterTypeButton.getValue() == Filter.Type.Power) ? Integer.valueOf(valueText) : valueText;
 
@@ -262,13 +261,13 @@ public class ListCommandGui extends Screen
 
 			public Entry(PortalInfo portal)
 			{
-				dimensionBox = new EditBox(minecraft.font, 0, 0, 100, itemHeight - PADDING, TextComponent.EMPTY);
+				dimensionBox = new EditBox(minecraft.font, 0, 0, 100, itemHeight - PADDING, CommonComponents.EMPTY);
 				dimensionBox.setTextColor(WHITE);
 				dimensionBox.setMaxLength(256);
 				dimensionBox.setValue(portal.dimension.location().toString());
 				dimensionBox.moveCursorToStart();
 
-				locationBox = new EditBox(minecraft.font, 100 + PADDING, 0, 100, itemHeight - PADDING, TextComponent.EMPTY);
+				locationBox = new EditBox(minecraft.font, 100 + PADDING, 0, 100, itemHeight - PADDING, CommonComponents.EMPTY);
 				locationBox.setTextColor(WHITE);
 				locationBox.setMaxLength(48);
 				locationBox.setValue(Utils.getReadablyBlockPos(portal.location));
@@ -290,7 +289,7 @@ public class ListCommandGui extends Screen
 
 				for (int i = 0; i < 4; i++)
 				{
-					countLabels[i] = new TextComponent(String.format("%dx", i + 1)).getVisualOrderText();
+					countLabels[i] = Component.translatable(String.format("%dx", i + 1)).getVisualOrderText();
 					countLabelWidths[i] = minecraft.font.width(countLabels[i]);
 				}
 
@@ -300,13 +299,13 @@ public class ListCommandGui extends Screen
 					addressItems.add(item);
 				});
 
-				addressBox = new EditBox(minecraft.font, 200 + 2 * PADDING, 0, 100, itemHeight - PADDING, TextComponent.EMPTY);
+				addressBox = new EditBox(minecraft.font, 200 + 2 * PADDING, 0, 100, itemHeight - PADDING, CommonComponents.EMPTY);
 				addressBox.setTextColor(WHITE);
 				addressBox.setMaxLength(256);
 				addressBox.setValue(portal.address.toString());
 				addressBox.moveCursorToStart();
 
-				powerBox = new EditBox(minecraft.font, 300 + 3 * PADDING, 0, 100, itemHeight - PADDING, TextComponent.EMPTY);
+				powerBox = new EditBox(minecraft.font, 300 + 3 * PADDING, 0, 100, itemHeight - PADDING, CommonComponents.EMPTY);
 				powerBox.setTextColor(WHITE);
 				powerBox.setMaxLength(10);
 				powerBox.setValue(Integer.toString(portal.power));

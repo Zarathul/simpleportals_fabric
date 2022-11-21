@@ -4,7 +4,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
 import net.minecraft.locale.Language;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.*;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -22,11 +22,10 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.LevelData;
 import net.minecraft.world.phys.Vec3;
 import net.zarathul.simpleportals.Settings;
-import net.zarathul.simpleportals.mixin.DirectionAccessor;
 import net.zarathul.simpleportals.mixin.EntityAccessor;
 import net.zarathul.simpleportals.mixin.ServerPlayerAccessor;
 
-import java.util.*;
+import java.util.ArrayList;
 
 /**
  * General utility class.
@@ -60,9 +59,9 @@ public final class Utils
 	 * @return
 	 * A list of localized strings for the specified key, or an empty list if the key was not found.
 	 */
-	public static ArrayList<TextComponent> multiLineTranslate(String key, Object... args)
+	public static ArrayList<Component> multiLineTranslate(String key, Object... args)
 	{
-		ArrayList<TextComponent> lines = new ArrayList<>();
+		ArrayList<Component> lines = new ArrayList<>();
 
 		if (key != null)
 		{
@@ -71,7 +70,7 @@ public final class Utils
 
 			while (I18N.has(currentKey))
 			{
-				lines.add(new TextComponent(String.format(I18N.getOrDefault(currentKey), args)));
+				lines.add(Component.literal(String.format(I18N.getOrDefault(currentKey), args)));
 				currentKey = key + ++x;
 			}
 		}
@@ -218,7 +217,7 @@ public final class Utils
 		ServerLevel originDimension = player.getLevel();
 		LevelData levelData = destinationDimension.getLevelData();
 
-		player.connection.send(new ClientboundRespawnPacket(destinationDimension.dimensionTypeRegistration(), destinationDimension.dimension(), BiomeManager.obfuscateSeed(destinationDimension.getSeed()), player.gameMode.getGameModeForPlayer(), player.gameMode.getPreviousGameModeForPlayer(), destinationDimension.isDebug(), destinationDimension.isFlat(), true));
+		player.connection.send(new ClientboundRespawnPacket(destinationDimension.dimensionTypeId(), destinationDimension.dimension(), BiomeManager.obfuscateSeed(destinationDimension.getSeed()), player.gameMode.getGameModeForPlayer(), player.gameMode.getPreviousGameModeForPlayer(), destinationDimension.isDebug(), destinationDimension.isFlat(), true, player.getLastDeathLocation()));
 		player.connection.send(new ClientboundChangeDifficultyPacket(levelData.getDifficulty(), levelData.isDifficultyLocked()));
 
 		PlayerList playerList = player.server.getPlayerList();
@@ -363,21 +362,6 @@ public final class Utils
 		public static final int SKIP_LIGHTING_UPDATE = 128;
 
 		public static final int FULL_UPDATE = DO_COMPARATOR_UPDATE | DO_BLOCK_UPDATE;
-	}
-
-	private static final Map<String, Direction> DIRECTION_NAME_MAP = DirectionAccessor.getByNameMap();
-
-	/**
-	 * Get a direction by name.
-	 * For some reason this is not available in the server environment, that's why this method exists.
-	 * @param name
-	 * The name representing the direction.
-	 * @return
-	 * A <code>Direction</code> if a valid name was passed, otherwise <code>null</code>.
-	 */
-	public static Direction getDirectionByName(String name)
-	{
-		return (name == null) ? null : DIRECTION_NAME_MAP.get(name.toLowerCase(Locale.ROOT));
 	}
 
 	/**

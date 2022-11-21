@@ -3,7 +3,6 @@ package net.zarathul.simpleportals.registration;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
-import net.zarathul.simpleportals.common.Utils;
 
 /**
  * Represents a corner of a portal.
@@ -87,8 +86,8 @@ public class Corner
 		
 		pos = BlockPos.of(nbt.getLong("pos"));
 
-		facingA = Utils.getDirectionByName(nbt.getString("facingA"));
-		facingB = Utils.getDirectionByName(nbt.getString("facingB"));
+		facingA = Direction.byName(nbt.getString("facingA"));
+		facingB = Direction.byName(nbt.getString("facingB"));
 	}
 	
 	@Override

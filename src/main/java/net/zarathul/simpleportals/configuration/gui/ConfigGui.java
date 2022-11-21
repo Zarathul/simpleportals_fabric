@@ -14,9 +14,8 @@ import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.world.entity.player.Player;
 import net.zarathul.simpleportals.configuration.Config;
 import net.zarathul.simpleportals.configuration.ConfigSetting;
@@ -44,7 +43,7 @@ public class ConfigGui extends Screen
 	private static final int BUTTON_HEIGHT = 20;
 	private static final int ENTRY_HEIGHT = 26;
 
-	public ConfigGui(TextComponent title, Class<?> settingsType, String configName, Player player, Consumer<Player> syncChanges)
+	public ConfigGui(Component title, Class<?> settingsType, String configName, Player player, Consumer<Player> syncChanges)
 	{
 		super(title);
 
@@ -73,7 +72,7 @@ public class ConfigGui extends Screen
 
 	private void addButton(int x, int y, int width, String i18nKey, Button.OnPress pressHandler)
 	{
-		Button button = new Button(x, y, width, BUTTON_HEIGHT, new TranslatableComponent(i18nKey), pressHandler);
+		Button button = new Button(x, y, width, BUTTON_HEIGHT, Component.translatable(i18nKey), pressHandler);
 		addRenderableWidget(button);
 	}
 
@@ -122,7 +121,7 @@ public class ConfigGui extends Screen
 
 				if (tooltip != null && !tooltip.isEmpty())
 				{
-					List<Component> comment = Arrays.stream(tooltip.split("\n")).map(TextComponent::new).collect(Collectors.toList());
+					List<Component> comment = Arrays.stream(tooltip.split("\n")).map(Component::translatable).collect(Collectors.toList());
 					renderComponentTooltip(poseStack, comment, mouseX, mouseY);
 
 					break;
@@ -301,7 +300,7 @@ public class ConfigGui extends Screen
 
 				if (value instanceof Boolean)
 				{
-					this.checkBox = new CheckboxButtonEx(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, TextComponent.EMPTY, (boolean)value);
+					this.checkBox = new CheckboxButtonEx(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, CommonComponents.EMPTY, (boolean)value);
 					this.checkBox.active = widgetIsActive;
 
 					addRenderableWidget(this.checkBox);
@@ -315,7 +314,7 @@ public class ConfigGui extends Screen
 				}
 				else
 				{
-					this.editBox = new EditBox(minecraft.font, 0, 0, 100, BUTTON_HEIGHT, TextComponent.EMPTY);
+					this.editBox = new EditBox(minecraft.font, 0, 0, 100, BUTTON_HEIGHT, CommonComponents.EMPTY);
 					this.editBox.setTextColor(ChatFormatting.WHITE.getColor());
 					this.editBox.setMaxLength(256);
 					this.editBox.setCanLoseFocus(true);

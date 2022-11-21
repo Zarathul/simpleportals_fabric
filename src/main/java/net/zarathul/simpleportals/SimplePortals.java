@@ -2,21 +2,22 @@ package net.zarathul.simpleportals;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.client.itemgroup.FabricItemGroupBuilder;
-import net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.command.v2.ArgumentTypeRegistry;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.commands.synchronization.ArgumentTypes;
-import net.minecraft.commands.synchronization.EmptyArgumentSerializer;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.synchronization.SingletonArgumentInfo;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Registry;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.chat.ChatType;
-import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -51,7 +52,6 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class SimplePortals implements ModInitializer
@@ -97,7 +97,8 @@ public class SimplePortals implements ModInitializer
 	public void onInitialize()
 	{
 		// Register custom block argument type for command parser.
-		ArgumentTypes.register(MOD_ID + ":block_argument", BlockArgument.class, new EmptyArgumentSerializer(BlockArgument::block));
+		ArgumentTypeRegistry.registerArgumentType(new ResourceLocation(MOD_ID, "block_argument"), BlockArgument.class, SingletonArgumentInfo.contextFree(BlockArgument::block));
+		//Registry.register(Registry.COMMAND_ARGUMENT_TYPE, MOD_ID + ":block_argument", BlockArgument.class, SingletonArgumentInfo.contextFree(BlockArgument::block));
 
 		// Load or create config file.
 		Config.loadOrCreate(MOD_ID, Settings.class);
@@ -114,9 +115,36 @@ public class SimplePortals implements ModInitializer
 		Registry.register(Registry.ITEM, new ResourceLocation(MOD_ID, ITEM_PORTAL_ACTIVATOR_NAME), itemPortalActivator);
 
 		// Register Commands.
-		CommandRegistrationCallback.EVENT.register((dispatcher, isDedicatedServer) -> {
+		CommandRegistrationCallback.EVENT.register((dispatcher, registry, environment) -> {
 			CommandPortals.register(dispatcher);
 			CommandTeleport.register(dispatcher);
+
+			if (environment.includeIntegrated)
+			{
+				dispatcher.register(
+					Commands.literal("sportals")
+					.then(
+						Commands.literal("config")	// sportals config
+						.executes(context -> {
+							FriendlyByteBuf sendBuffer = PacketByteBufs.create();
+							sendBuffer.writeEnum(ConfigCommandMode.GetServerSettings);
+
+							ClientPlayNetworking.send(SimplePortals.CONFIG_COMMAND_PACKET_ID, sendBuffer);
+
+							return 1;
+						})
+					)
+					.then(
+						Commands.literal("list")
+						.requires(commandSource -> commandSource.hasPermission(4))
+						.executes(context -> {
+							ClientPlayNetworking.send(SimplePortals.LIST_COMMAND_PACKET_ID, PacketByteBufs.empty());
+
+							return 1;
+						})
+					)
+				);
+			}
 		});
 
 		// Handle teleportation queue in server tick event.
@@ -214,7 +242,7 @@ public class SimplePortals implements ModInitializer
 				{
 					if (!player.hasPermissions(4))
 					{
-						player.sendMessage(new TranslatableComponent("missing_permission"), ChatType.SYSTEM, UUID.randomUUID());
+						player.sendSystemMessage(Component.translatable("missing_permission"));
 						return;
 					}
 
@@ -228,7 +256,7 @@ public class SimplePortals implements ModInitializer
 		ServerPlayNetworking.registerGlobalReceiver(LIST_COMMAND_PACKET_ID, (server, player, packetListener, receiveBuffer, sender) -> {
 			if (!player.hasPermissions(4))
 			{
-				player.sendMessage(new TranslatableComponent("missing_permission"), ChatType.SYSTEM, UUID.randomUUID());
+				player.sendSystemMessage(Component.translatable("missing_permission"));
 				return;
 			}
 
@@ -249,7 +277,7 @@ public class SimplePortals implements ModInitializer
 		ServerPlayNetworking.registerGlobalReceiver(TPD_COMMAND_PACKET_ID, (server, player, packetListener, receiveBuffer, sender) -> {
 			if (!player.hasPermissions(4))
 			{
-				player.sendMessage(new TranslatableComponent("missing_permission"), ChatType.SYSTEM, UUID.randomUUID());
+				player.sendSystemMessage(Component.translatable("missing_permission"));
 				return;
 			}
 

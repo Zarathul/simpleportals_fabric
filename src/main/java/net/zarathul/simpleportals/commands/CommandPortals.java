@@ -11,7 +11,7 @@ import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
-import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -244,7 +244,7 @@ public class CommandPortals
 					}
 					catch (CommandSyntaxException ex)
 					{
-						throw new CommandRuntimeException(new TranslatableComponent("commands.errors.unknown_sender_dimension"));
+						throw new CommandRuntimeException(Component.translatable("commands.errors.unknown_sender_dimension"));
 					}
 				}
 				else
@@ -253,7 +253,7 @@ public class CommandPortals
 				}
 
 				portals = PortalRegistry.getPortalsAt(pos, dimension);
-				if (portals == null || portals.size() == 0)	throw new CommandRuntimeException(new TranslatableComponent("commands.errors.portal_not_found_at_pos_in_dimension", pos.getX(), pos.getY(), pos.getZ(), dimension.location()));
+				if (portals == null || portals.size() == 0)	throw new CommandRuntimeException(Component.translatable("commands.errors.portal_not_found_at_pos_in_dimension", pos.getX(), pos.getY(), pos.getZ(), dimension.location()));
 
 				break;
 		}
@@ -265,7 +265,7 @@ public class CommandPortals
 		{
 			portalPos = portal.getCorner1().getPos();
 			dimensionServer = source.getServer().getLevel(portal.getDimension());
-			if (dimensionServer == null) throw new CommandRuntimeException(new TranslatableComponent("commands.errors.missing_dimension", portal.getDimension().location()));
+			if (dimensionServer == null) throw new CommandRuntimeException(Component.translatable("commands.errors.missing_dimension", portal.getDimension().location()));
 
 			PortalRegistry.deactivatePortal(dimensionServer, portalPos);
 			SendTranslatedMessage(source, "commands.sportals.deactivate.success", portalPos.getX(), portalPos.getY(), portalPos.getZ(), portal.getDimension().location());
@@ -288,7 +288,7 @@ public class CommandPortals
 			}
 			catch (CommandSyntaxException ex)
 			{
-				throw new CommandRuntimeException(new TranslatableComponent("commands.errors.unknown_sender_dimension"));
+				throw new CommandRuntimeException(Component.translatable("commands.errors.unknown_sender_dimension"));
 			}
 		}
 		else
@@ -300,11 +300,11 @@ public class CommandPortals
 
 		if (portals == null || portals.size() == 0)
 		{
-			throw new CommandRuntimeException(new TranslatableComponent("commands.errors.portal_not_found_at_pos_in_dimension", pos.getX(), pos.getY(), pos.getZ(), dimension.location()));
+			throw new CommandRuntimeException(Component.translatable("commands.errors.portal_not_found_at_pos_in_dimension", pos.getX(), pos.getY(), pos.getZ(), dimension.location()));
 		}
 		else if (portals.size() > 1)
 		{
-			throw new CommandRuntimeException(new TranslatableComponent("commands.errors.multiple_portals_found_at_pos_in_dimension", pos.getX(), pos.getY(), pos.getZ(), dimension.location()));
+			throw new CommandRuntimeException(Component.translatable("commands.errors.multiple_portals_found_at_pos_in_dimension", pos.getX(), pos.getY(), pos.getZ(), dimension.location()));
 		}
 
 		Portal portal = portals.get(0);
@@ -357,6 +357,6 @@ public class CommandPortals
 
 	private static void SendTranslatedMessage(CommandSourceStack source, String message, Object... args)
 	{
-		source.sendSuccess(new TranslatableComponent(message, args), false);
+		source.sendSuccess(Component.translatable(message, args), false);
 	}
 }

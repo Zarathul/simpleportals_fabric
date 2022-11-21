@@ -4,7 +4,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.resources.language.I18n;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.Component;
 
 
 @Environment(EnvType.CLIENT)
@@ -13,7 +13,7 @@ public class EnumOptionButton<E extends Enum<E>> extends Button
 	private final Class<E> clazz;
 	private int selectedIndex;
 	private final String[] names;
-	private final TextComponent[] i18nNames;
+	private final Component[] i18nNames;
 
 	private static final String I18N_ENUM_PREFIX = "config.enums.";
 	/**
@@ -24,7 +24,7 @@ public class EnumOptionButton<E extends Enum<E>> extends Button
 	public EnumOptionButton(Class<E> clazz, String value, int x, int y, int width, int height)
 	{
 		super(x, y, width, height,
-			  new TextComponent(I18n.get(I18N_ENUM_PREFIX + clazz.getSimpleName().toLowerCase() + "." + value.toLowerCase())),
+			  Component.translatable(I18n.get(I18N_ENUM_PREFIX + clazz.getSimpleName().toLowerCase() + "." + value.toLowerCase())),
 			  (button) -> {});
 
 		this.clazz = clazz;
@@ -34,12 +34,12 @@ public class EnumOptionButton<E extends Enum<E>> extends Button
 
 		E[] constants = clazz.getEnumConstants();
 		this.names = new String[constants.length];
-		this.i18nNames = new TextComponent[constants.length];
+		this.i18nNames = new Component[constants.length];
 
 		for (E e : constants)
 		{
 			names[i] = e.name();
-			i18nNames[i] = new TextComponent(I18n.get(I18N_ENUM_PREFIX + clazz.getSimpleName().toLowerCase() + "." + e.name().toLowerCase()));
+			i18nNames[i] = Component.translatable(I18n.get(I18N_ENUM_PREFIX + clazz.getSimpleName().toLowerCase() + "." + e.name().toLowerCase()));
 			if (e.name().equals(value)) selectedIndex = i;
 			i++;
 		}

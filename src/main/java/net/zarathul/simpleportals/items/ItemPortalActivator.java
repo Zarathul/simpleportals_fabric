@@ -10,7 +10,6 @@ import net.minecraft.core.Direction.Axis;
 import net.minecraft.core.Direction.AxisDirection;
 import net.minecraft.core.dispenser.DefaultDispenseItemBehavior;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -111,7 +110,7 @@ public class ItemPortalActivator extends Item
 		}
 		else
 		{
-			tooltip.add(new TranslatableComponent(toolTipKey));
+			tooltip.add(Component.translatable(toolTipKey));
 		}
 	}
 

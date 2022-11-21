@@ -6,7 +6,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.CommonComponents;
 
 @Environment(EnvType.CLIENT)
 class ValidationStatusButton extends Button
@@ -15,7 +15,7 @@ class ValidationStatusButton extends Button
 
 	public ValidationStatusButton(int x, int y, Button.OnPress clickHandler)
 	{
-		super(x, y, 15, 15, TextComponent.EMPTY, clickHandler);
+		super(x, y, 15, 15, CommonComponents.EMPTY, clickHandler);
 
 		this.valid = true;
 	}

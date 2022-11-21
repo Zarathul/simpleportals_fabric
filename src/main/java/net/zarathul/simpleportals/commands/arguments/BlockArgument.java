@@ -10,7 +10,7 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.core.Registry;
-import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
 
@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 
 public class BlockArgument implements ArgumentType<Block>
 {
-	private static final DynamicCommandExceptionType INVALID_ADDRESS = new DynamicCommandExceptionType((args) -> new TranslatableComponent("commands.errors.block_argument", args));
+	private static final DynamicCommandExceptionType INVALID_ADDRESS = new DynamicCommandExceptionType((args) -> Component.translatable("commands.errors.block_argument", args));
 	private static final Collection<String> EXAMPLES = Arrays.asList(
 		"minecraft:dirt",
 		"minecraft:iron_block",

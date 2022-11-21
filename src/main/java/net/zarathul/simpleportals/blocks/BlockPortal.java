@@ -13,6 +13,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
@@ -38,7 +39,6 @@ import net.zarathul.simpleportals.registration.PortalRegistry;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Random;
 import java.util.stream.Collectors;
 
 /**
@@ -58,8 +58,8 @@ public class BlockPortal extends Block
 	public BlockPortal()
 	{
 		super(Properties.of(Material.PORTAL)
-			.noDrops()
-			 .noCollission()
+			.noLootTable()
+			.noCollission()
 			.strength(-1.0F) // indestructible by normal means
 			.lightLevel((state) -> 11)
 			.sound(SoundType.GLASS));
@@ -262,7 +262,7 @@ public class BlockPortal extends Block
 
 	@Override
 	@Environment(EnvType.CLIENT)
-	public void animateTick(BlockState state, Level world, BlockPos pos, Random random)
+	public void animateTick(BlockState state, Level world, BlockPos pos, RandomSource random)
 	{
 		if (Settings.ambientSoundEnabled && random.nextInt(100) == 0)
 		{

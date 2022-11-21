@@ -4,7 +4,6 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -48,7 +47,7 @@ public class ItemPortalFrame extends BlockItem
 		}
 		else
 		{
-			tooltip.add(new TranslatableComponent(toolTipKey));
+			tooltip.add(Component.translatable(toolTipKey));
 		}
 	}
 }
