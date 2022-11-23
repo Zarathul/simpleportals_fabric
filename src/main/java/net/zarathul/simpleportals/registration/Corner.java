@@ -74,8 +74,8 @@ public class Corner
 	{
 		CompoundTag tag = new CompoundTag();
 		tag.putLong("pos", pos.asLong());
-		tag.putString("facingA", facingA.name());
-		tag.putString("facingB", facingB.name());
+		tag.putString("facingA", facingA.getSerializedName());
+		tag.putString("facingB", facingB.getSerializedName());
 		
 		return tag;
 	}

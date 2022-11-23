@@ -433,7 +433,7 @@ public class Portal
 		CompoundTag tag = new CompoundTag();
 		tag.putString("dimension", (dimension.location() != null) ? dimension.location().toString() : "");
 		tag.put("address", address.serializeNBT());
-		tag.putString("axis", axis.name());
+		tag.putString("axis", axis.getSerializedName());
 		tag.put("corner1", corner1.serializeNBT());
 		tag.put("corner2", corner2.serializeNBT());
 		tag.put("corner3", corner3.serializeNBT());
