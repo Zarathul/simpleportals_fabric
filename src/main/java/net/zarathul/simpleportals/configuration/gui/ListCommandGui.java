@@ -25,7 +25,6 @@ import net.zarathul.simpleportals.common.Utils;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 
 @Environment(EnvType.CLIENT)
@@ -33,8 +32,8 @@ public class ListCommandGui extends Screen
 {
 	private PortalList portalList;
 	private final List<PortalInfo> portals;
-	private EnumOptionButton<Filter.Type> filterTypeButton;
-	private EnumOptionButton<Filter.Condition> filterConditionButton;
+	private CycleButtonEx<Filter.Type> filterTypeButton;
+	private CycleButtonEx<Filter.Condition> filterConditionButton;
 	private EditBox filterValueBox;
 	private StringWidget dimensionLabel;
 	private StringWidget locationLabel;
@@ -59,6 +58,7 @@ public class ListCommandGui extends Screen
 	private static final int FILTER_TYPE_BUTTON_WIDTH = 80;
 	private static final int FILTER_CONDITION_BUTTON_WIDTH = 100;
 	private static final int APPLY_BUTTON_WIDTH = 60;
+	private static final String I18N_ENUM_PREFIX = "config.enums.";
 	private final int FILTER_LABEL_WIDTH = font.width(FILTER_LABEL);
 
 	public ListCommandGui(List<PortalInfo> portals)
@@ -103,13 +103,16 @@ public class ListCommandGui extends Screen
 
 		filterHorizontalLayout.addChild(new StringWidget(FILTER_LABEL_WIDTH, 9, FILTER_LABEL, font), layoutSettings -> layoutSettings.alignVerticallyMiddle().paddingHorizontal(PADDING));
 
-		filterTypeButton = new EnumOptionButton<>(Filter.Type.class, Optional.of(filter.type), FILTER_TYPE_BUTTON_WIDTH, BUTTON_HEIGHT, (button -> {
-			filterConditionButton.setAllowedValues(Filter.CONDITIONS_BY_TYPE.get(filterTypeButton.getValue()));
+		filterTypeButton = new CycleButtonEx<>(BUTTON_HEIGHT, FILTER_TYPE_BUTTON_WIDTH, this::stringifyEnumAsTranslatableKey, (button -> {
+			filterConditionButton.setValues(Filter.CONDITIONS_BY_TYPE.get(filterTypeButton.getSelectedValue()));
 		}));
+		filterTypeButton.setValues(Filter.CONDITIONS_BY_TYPE.keySet());
+		filterTypeButton.setSelectedValue(filter.type);
 		filterHorizontalLayout.addChild(filterTypeButton, layoutSettings -> layoutSettings.alignVerticallyMiddle().paddingRight(PADDING));
 
-		filterConditionButton = new EnumOptionButton<>(Filter.Condition.class, Optional.of(filter.condition), FILTER_CONDITION_BUTTON_WIDTH, BUTTON_HEIGHT);
-		filterConditionButton.setAllowedValues(Filter.CONDITIONS_BY_TYPE.get(filter.type));
+		filterConditionButton = new CycleButtonEx<>(BUTTON_HEIGHT, FILTER_CONDITION_BUTTON_WIDTH, this::stringifyEnumAsTranslatableKey);
+		filterConditionButton.setValues(Filter.CONDITIONS_BY_TYPE.get(filter.type));
+		filterConditionButton.setSelectedValue(filter.condition);
 		filterHorizontalLayout.addChild(filterConditionButton, layoutSettings -> layoutSettings.alignVerticallyMiddle().paddingRight(PADDING));
 
 		filterValueBox = new EditBox(font, 0, 0, 10, BUTTON_HEIGHT, CommonComponents.EMPTY);
@@ -158,11 +161,16 @@ public class ListCommandGui extends Screen
 	private void applyFilter(Button button)
 	{
 		String valueText = filterValueBox.getValue();
-		Object value = (filterTypeButton.getValue() == Filter.Type.Power) ? Integer.valueOf(valueText) : valueText;
+		Object value = (filterTypeButton.getSelectedValue() == Filter.Type.Power) ? Integer.valueOf(valueText) : valueText;
 
-		Filter filter = new Filter(filterTypeButton.getValue(), filterConditionButton.getValue(), value);
+		Filter filter = new Filter(filterTypeButton.getSelectedValue(), filterConditionButton.getSelectedValue(), value);
 		// Trying to modify the screen resulted in all kinds of graphical bugs, so let's just make a new one every time the filter changes.
 		minecraft.gui.setScreen(new ListCommandGui(portals, filter));
+	}
+
+	private <T extends Enum<?>> String stringifyEnumAsTranslatableKey(T component)
+	{
+		return I18N_ENUM_PREFIX + component.getClass().getSimpleName().toLowerCase() + "." + component.name().toLowerCase();
 	}
 
 	@Override

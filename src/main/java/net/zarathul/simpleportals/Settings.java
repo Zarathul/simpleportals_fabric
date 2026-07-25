@@ -1,9 +1,6 @@
 package net.zarathul.simpleportals;
 
-import net.fabricmc.fabric.api.event.registry.FabricRegistry;
-import net.fabricmc.fabric.api.recipe.v1.FabricRecipeManager;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
@@ -24,7 +21,7 @@ public final class Settings
 	public static final int powerCostDefault = 1;
 	public static boolean powerCostValidator(int value)
 	{
-		return (value >= 0);
+		return (value >= 0 && value <= powerCapacity);
 	}
 
 	@ConfigSetting(descriptionKey = "power_capacity", description = "The amount of power a portal can store.", category = "common", permissionLvl = 4)
@@ -32,7 +29,7 @@ public final class Settings
 	public static final int powerCapacityDefault = 64;
 	public static boolean powerCapacityValidator(int value)
 	{
-		return (value > 0);
+		return (value > 0 && value >= powerCost);
 	}
 
 	@ConfigSetting(descriptionKey = "player_teleportation_delay", description = "The delay in ticks before a player actually gets teleported. Needs to be lower than the cooldown.", category = "common", permissionLvl = 4)
@@ -90,7 +87,7 @@ public final class Settings
 	public static final boolean particlesEnabledDefault = true;
 
 	@ConfigSetting(descriptionKey = "ambient_sound_enabled", description = "If enabled, portals emit an ambient sound.", category = "client", clientOnly = true)
-	public static boolean ambientSoundEnabled ;
+	public static boolean ambientSoundEnabled;
 	public static final boolean ambientSoundEnabledDefault = false;
 
 	@ConfigSetting(descriptionKey = "teleportation_sound_enabled", description = "If enabled, a sound effect is played to the player after a successful teleportation.", category = "client", clientOnly = true)

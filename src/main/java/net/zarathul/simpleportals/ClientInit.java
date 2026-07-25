@@ -143,7 +143,7 @@ public class ClientInit implements ClientModInitializer
 			Config.readServerSettings(Settings.class, payload.values(), ctx.player());
 
 			var client = ctx.client();
-			client.execute(() -> client.gui.setScreen(new ConfigGui(Component.translatable("§nSimplePortals"), Settings.class, SimplePortals.MOD_ID, client.player, player -> {
+			client.execute(() -> client.gui.setScreen(new ConfigGui(Component.literal("§nSimplePortals"), Settings.class, SimplePortals.MOD_ID, client.player, player -> {
 				List<ConfigValue> configValues = new ArrayList<>();
 				Config.writeServerSettings(Settings.class, configValues, player);
 

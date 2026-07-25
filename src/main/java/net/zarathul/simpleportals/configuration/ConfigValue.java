@@ -43,37 +43,31 @@ public record ConfigValue(Type type, Object value)
 				}
 			}
 
-			ConfigValue decodedValue = new ConfigValue(type, value);
-
-			return decodedValue;
+			return new ConfigValue(type, value);
 		}
 
 		@Override
-		public void encode(FriendlyByteBuf output, ConfigValue value)
+		public void encode(FriendlyByteBuf output, ConfigValue configValue)
 		{
-			output.writeEnum(value.type);
+			output.writeEnum(configValue.type);
 
-			switch (value.type)
+			switch (configValue.type)
 			{
-				case Int ->
+				case Int, Enum ->
 				{
-					output.writeInt((int)value.value);
+					output.writeInt((int)configValue.value);
 				}
 				case Float ->
 				{
-					output.writeFloat((float)value.value);
+					output.writeFloat((float)configValue.value);
 				}
 				case Boolean ->
 				{
-					output.writeBoolean((boolean)value.value);
-				}
-				case Enum ->
-				{
-					output.writeInt(((Enum<?>)value.value).ordinal());
+					output.writeBoolean((boolean)configValue.value);
 				}
 				case String, Complex ->
 				{
-					output.writeUtf((String)value.value);
+					output.writeUtf((String)configValue.value);
 				}
 			}
 		}

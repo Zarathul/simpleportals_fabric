@@ -180,6 +180,10 @@ public final class Config
 					StorageMethods storage = getLoadSave(field).get();
 					value = storage.load.invoke(null, (String)configValues.get(valueIndex).value());
 				}
+				else if (field.getType().isEnum())
+				{
+					value = ((Enum<?>[])field.getType().getEnumConstants())[(int)configValues.get(valueIndex).value()];
+				}
 				else
 				{
 					value = configValues.get(valueIndex).value();

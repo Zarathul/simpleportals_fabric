@@ -56,7 +56,7 @@ public class ConfigGui extends Screen
 		this.syncChanges = syncChanges;
 
 
-		int HEADER_HEIGHT = 2 * font.lineHeight + BUTTON_HEIGHT + 4 * PADDING;
+		int HEADER_HEIGHT = 2 * font.lineHeight + 2 * PADDING;
 		layout = new HeaderAndFooterLayout(this, HEADER_HEIGHT, FOOTER_HEIGHT);
 	}
 
@@ -88,7 +88,7 @@ public class ConfigGui extends Screen
 		LinearLayout horizontalLayout = layout.addToFooter(LinearLayout.horizontal());
 		horizontalLayout.spacing(PADDING);
 
-		horizontalLayout.addChild(Button.builder(CommonComponents.GUI_CANCEL, button -> onClose()).width(200).build());	// Cancel button
+		horizontalLayout.addChild(Button.builder(CommonComponents.GUI_BACK, button -> onClose()).width(200).build());	// Cancel button
 		horizontalLayout.addChild(Button.builder(Component.translatable("config.save"), button -> saveConfigAndCloseScreen()).width(200).build());	// Done button
 	}
 
@@ -96,8 +96,9 @@ public class ConfigGui extends Screen
 	{
 		optionList.commitChanges();
 		Config.save(configName, settingsType);
-		minecraft.gui.setScreen(null);
 		if (syncChanges != null) syncChanges.accept(player);
+
+		minecraft.gui.setScreen(new ConfigGui(title, settingsType, configName, player, syncChanges));
 	}
 
 	@Override
@@ -107,13 +108,6 @@ public class ConfigGui extends Screen
 		optionList.updateSize(width, layout);
 		layout.arrangeElements();
 	}
-//	@Override
-//	public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a)
-//	{
-//		super.extractRenderState(graphics, mouseX, mouseY, a);
-//
-//		graphics.text(minecraft.font, title.getVisualOrderText(), PADDING, PADDING, ARGB.white(1));
-//	}
 
 	@Environment(EnvType.CLIENT)
 	public class ModOptionList extends ContainerObjectSelectionList<ModOptionList.Entry>
@@ -145,32 +139,12 @@ public class ConfigGui extends Screen
 				if (tooltip != null && !tooltip.isEmpty())
 				{
 					List<Component> comment = Arrays.stream(tooltip.split("\n")).map(Component::translatable).collect(Collectors.toList());
-					graphics.setComponentTooltipForNextFrame(minecraft.font, comment, mouseX, mouseY);
+					graphics.setComponentTooltipForNextFrame(font, comment, mouseX, mouseY);
 
 					break;
 				}
 			}
 		}
-		//		@Override
-//		public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTicks)
-//		{
-//			super.render(poseStack, mouseX, mouseY, partialTicks);
-//
-//			String tooltip;
-//
-//			for (Entry entry : this.children())
-//			{
-//				tooltip = entry.getTooltip();
-//
-//				if (tooltip != null && !tooltip.isEmpty())
-//				{
-//					List<Component> comment = Arrays.stream(tooltip.split("\n")).map(Component::translatable).collect(Collectors.toList());
-//					renderComponentTooltip(poseStack, comment, mouseX, mouseY);
-//
-//					break;
-//				}
-//			}
-//		}
 
 		@Override
 		public int getRowWidth()
@@ -286,7 +260,7 @@ public class ConfigGui extends Screen
 			private StringWidget optionLabel;
 			private EditBox editBox;
 			private CheckboxButtonEx checkBox;
-			private EnumOptionButton enumButton;
+			private CycleButtonEx<Object> enumButton;
 			private final ImageButton needsWorldRestartButton;
 			private final ValidationStatusButton validatedButton;
 			private String tooltipText;
@@ -299,8 +273,8 @@ public class ConfigGui extends Screen
 			public OptionEntry(Field valueField, ConfigSetting annotation, Player player)
 			{
 				this.valueField = valueField;
-				this.validatorMethod = Config.getValidator(valueField);
 				this.annotation = valueField.getAnnotation(ConfigSetting.class);
+				validatorMethod = Config.getValidator(valueField);
 				Optional<StorageMethods> loadSave = Config.getLoadSave(valueField);
 				loadMethod = (loadSave.isPresent()) ? loadSave.get().load : null;
 
@@ -315,23 +289,21 @@ public class ConfigGui extends Screen
 
 				// Has to be instantiated before the rest, because 'validateTextFieldInput()', which is called by 'editBox' on validation, sets 'validatedButton' state.
 				validatedButton = new ValidationStatusButton(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, button -> {
-					if (this.editBox != null)
+					if (value instanceof Boolean)
 					{
-						this.editBox.setValue(defaultValue.toString());
-						this.editBox.setFocused(false);
+						checkBox.value = (boolean)defaultValue;
 					}
-					else if (this.checkBox != null)
+					else if (value instanceof Enum)
 					{
-						this.checkBox.value = (boolean)defaultValue;
+						enumButton.setSelectedValue(defaultValue);
 					}
-					else if (this.enumButton != null)
+					else
 					{
-						this.enumButton.setValue((Enum)defaultValue);
+						editBox.setValue(defaultValue.toString());
+						editBox.setFocused(false);
 					}
 				});
-				this.validatedButton.active = widgetIsActive;
-
-//				Object value = null;
+				validatedButton.active = widgetIsActive;
 
 				try
 				{
@@ -343,7 +315,7 @@ public class ConfigGui extends Screen
 				}
 
 				checkBox = new CheckboxButtonEx(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, false);
-				enumButton = new EnumOptionButton(0, 0, 100, BUTTON_HEIGHT);
+				enumButton = new CycleButtonEx<>(BUTTON_HEIGHT, value -> ((Enum)value).name());
 				editBox = new EditBox(minecraft.font, 0, 0, 100, BUTTON_HEIGHT, CommonComponents.EMPTY);
 				editBox.setMaxLength(256);
 				editBox.moveCursorToStart(false);
@@ -356,8 +328,9 @@ public class ConfigGui extends Screen
 				}
 				else if (value instanceof Enum)
 				{
-					enumButton.init(value.getClass(), value.toString());
 					enumButton.active = widgetIsActive;
+					enumButton.setValues(Arrays.stream(valueField.getType().getEnumConstants()).collect(Collectors.toList()));
+					enumButton.setSelectedValue(value);
 				}
 				else
 				{
@@ -366,11 +339,11 @@ public class ConfigGui extends Screen
 					editBox.setValue(value.toString());
 				}
 
-				this.needsWorldRestartButton = new ImageButton(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, new WidgetSprites(Identifier.withDefaultNamespace("icon/link")), (b) -> {});
-				this.needsWorldRestartButton.active = false;
-				this.needsWorldRestartButton.visible = annotation.needsWorldRestart();
+				needsWorldRestartButton = new ImageButton(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, new WidgetSprites(Identifier.withDefaultNamespace("icon/link")), (b) -> {});
+				needsWorldRestartButton.active = false;
+				needsWorldRestartButton.visible = annotation.needsWorldRestart();
 
-				this.tooltipText = null;
+				tooltipText = null;
 			}
 
 			@Override
@@ -386,18 +359,18 @@ public class ConfigGui extends Screen
 				validatedButton.setPosition(getContentRight() - validatedButton.getWidth() - needsWorldRestartButton.getWidth() - 2 * PADDING, Utils.centerIn(getContentY(), ENTRY_HEIGHT, needsWorldRestartButton.getHeight()));
 				validatedButton.extractRenderState(graphics, mouseX, mouseY, a);
 
-				if (checkBox != null && (value instanceof Boolean))
+				if (value instanceof Boolean)
 				{
 					checkBox.setPosition(centerX + PADDING, Utils.centerIn(getContentY(), ENTRY_HEIGHT, checkBox.getHeight()));
 					checkBox.extractRenderState(graphics, mouseX, mouseY, a);
 				}
-				else if (enumButton != null && (value instanceof Enum))
+				else if (value instanceof Enum)
 				{
 					enumButton.setPosition(centerX + PADDING, Utils.centerIn(getContentY(), ENTRY_HEIGHT, enumButton.getHeight()));
 					enumButton.setWidth(validatedButton.getX() - enumButton.getX() - PADDING);
 					enumButton.extractRenderState(graphics, mouseX, mouseY, a);
 				}
-				else if (editBox != null)
+				else
 				{
 					editBox.setPosition(centerX + PADDING, Utils.centerIn(getContentY(), ENTRY_HEIGHT, editBox.getHeight()));
 					editBox.setWidth(validatedButton.getX() - editBox.getX() - PADDING);
@@ -460,7 +433,7 @@ public class ConfigGui extends Screen
 				{
 					try
 					{
-						valueField.set(null, this.enumButton.getValue());
+						valueField.set(null, this.enumButton.getSelectedValue());
 					}
 					catch (IllegalAccessException ignored) {}
 				}
