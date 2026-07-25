@@ -6,18 +6,12 @@
     " G "
   ],
   "key": {
-    "E": {
-      "tag": "c:emeralds"
-    },
-    "I": {
-      "item": "minecraft:ender_eye"
-    },
-    "G": {
-      "tag": "c:gold_ingots"
-    }
+    "E": "#c:gems/emerald",
+    "I": "minecraft:ender_eye",
+    "G": "#c:ingots/gold"
   },
   "result": {
-    "item": "simpleportals:portal_activator",
+    "id": "simpleportals:portal_activator",
     "count": 1
   }
 }

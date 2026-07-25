@@ -143,7 +143,7 @@ public class BlockPortal extends Block
 					}
 					else
 					{
-						entity.remove(Entity.RemovalReason.DISCARDED);
+						entity.discard();
 					}
 
 					return;
@@ -160,13 +160,14 @@ public class BlockPortal extends Block
 			
 			if (portals == null || portals.size() < 2) return;
 			
-			// Get a shuffled list of possible destination portals (portals with the same address)
+			// Get a list of possible destination portals (portals with the same address)
 			List<Portal> destinations = portals.stream()
 				.filter(e -> !e.equals(start))
 				.collect(Collectors.toList());
 			
 			if (!destinations.isEmpty())
 			{
+				// Shuffle the destinations to make the exit portal random.
 				Collections.shuffle(destinations);
 
 				int entityHeight = Mth.ceil(entity.getBbHeight());

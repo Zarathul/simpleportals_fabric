@@ -6,18 +6,12 @@
     "OLO"
   ],
   "key": {
-    "L": {
-      "tag": "c:lapis_lazulis"
-    },
-    "O": {
-      "item": "minecraft:obsidian"
-    },
-    "P": {
-      "tag": "c:ender_pearls"
-    }
+    "L": "#c:gems/lapis",
+    "O": "#c:obsidians",
+    "P": "#c:ender_pearls"
   },
   "result": {
-    "item": "simpleportals:portal_frame",
+    "id": "simpleportals:portal_frame",
     "count": 4
   }
 }

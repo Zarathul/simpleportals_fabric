@@ -6,15 +6,11 @@
     " R "
   ],
   "key": {
-    "R": {
-      "tag": "c:redstone_dusts"
-    },
-    "F": {
-      "item": "simpleportals:portal_frame"
-    }
+    "R": "#c:dusts/redstone",
+    "F": "simpleportals:portal_frame"
   },
   "result": {
-    "item": "simpleportals:power_gauge",
+    "id": "simpleportals:power_gauge",
     "count": 1
   }
 }

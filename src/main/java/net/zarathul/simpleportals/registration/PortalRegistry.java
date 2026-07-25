@@ -70,7 +70,7 @@ public final class PortalRegistry extends SavedData
 		).apply(instance, PortalRegistry::new)
 	);
 
-	public static final SavedDataType<PortalRegistry> TYPE = new SavedDataType<>(Identifier.fromNamespaceAndPath(SimplePortals.MOD_ID, "portal_registry"), PortalRegistry::new, CODEC, null	);
+	public static final SavedDataType<PortalRegistry> TYPE = new SavedDataType<>(Utils.createModIdentifier("portal_registry"), PortalRegistry::new, CODEC, null	);
 
 	private final ImmutableMap<Direction,Direction[]> cornerSearchDirs;
 	private final ListMultimap<BlockPos, Portal> portals;
