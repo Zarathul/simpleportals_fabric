@@ -1,6 +1,7 @@
 package net.zarathul.simpleportals.blocks;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -8,15 +9,17 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.material.Material;
-import net.minecraft.world.level.material.MaterialColor;
+import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.level.redstone.Orientation;
 import net.minecraft.world.phys.BlockHitResult;
 import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.registration.Portal;
 import net.zarathul.simpleportals.registration.PortalRegistry;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -25,63 +28,70 @@ import java.util.List;
  */
 public class BlockPortalFrame extends Block
 {
-	public BlockPortalFrame()
+	public BlockPortalFrame(ResourceKey<Block> id)
 	{
-		super(Block.Properties.of(Material.STONE, MaterialColor.COLOR_BLACK)
-				.strength(50.0f, 200.0f)
-				.sound(SoundType.STONE)
-				.requiresCorrectToolForDrops());
+		super(Block.Properties.of()
+			.setId(id)
+			.mapColor(MapColor.COLOR_BLACK)
+			.strength(50.0f, 200.0f)
+			.sound(SoundType.STONE)
+			.requiresCorrectToolForDrops());
 	}
 
 	@Override
-	public InteractionResult use(BlockState state, Level world, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit)
+	protected InteractionResult useItemOn(ItemStack itemStack, BlockState state, Level world, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit)
 	{
 		if (!world.isClientSide())
 		{
 			ItemStack heldStack = player.getItemInHand(hand);
 			Item usedItem = heldStack.getItem();
+			Level playerLevel = player.level();;
 
 			if (usedItem == SimplePortals.itemPortalActivator)
 			{
 				if (player.isShiftKeyDown())
 				{
 					world.destroyBlock(pos, true);
+					return InteractionResult.SUCCESS_SERVER;
 				}
-				else if (!PortalRegistry.isPortalAt(pos, player.level.dimension()))
+				else if (!SimplePortals.portalRegistry.isPortalAt(pos, playerLevel.dimension()))
 				{
-					PortalRegistry.activatePortal((ServerLevel)world, pos, hit.getDirection());
+					return (SimplePortals.portalRegistry.activatePortal((ServerLevel)world, pos, hit.getDirection())) ? InteractionResult.SUCCESS_SERVER : InteractionResult.PASS;
 				}
+
+				return InteractionResult.PASS;
 			}
 		}
 
-		return super.use(state, world, pos, player, hand, hit);
+		return super.useItemOn(itemStack, state, world, pos, player, hand, hit);
 	}
 
 	@Override
-	public void onRemove(BlockState oldState, Level world, BlockPos pos, BlockState newState, boolean isMoving)
+	public void destroy(LevelAccessor level, BlockPos pos, BlockState state)
 	{
-		if (!world.isClientSide())
+		if (!level.isClientSide())
 		{
 			// Deactivate damaged portals.
 
-			List<Portal> affectedPortals = PortalRegistry.getPortalsAt(pos, world.dimension());
+			ServerLevel serverLevel = (ServerLevel)level;
+			List<Portal> affectedPortals = SimplePortals.portalRegistry.getPortalsAt(pos, serverLevel.dimension());
 
-			if (affectedPortals == null || affectedPortals.size() < 1) return;
-
-			Portal firstPortal = affectedPortals.get(0);
-			ServerLevel serverWorld = (ServerLevel)world;
-
-			if (firstPortal.isDamaged(serverWorld))
+			if (!affectedPortals.isEmpty())
 			{
-				PortalRegistry.deactivatePortal(serverWorld, pos);
+				Portal firstPortal = affectedPortals.getFirst();
+
+				if (firstPortal.isDamaged(serverLevel))
+				{
+					SimplePortals.portalRegistry.deactivatePortal(serverLevel, pos);
+				}
 			}
 		}
 
-		super.onRemove(oldState, world, pos, newState, isMoving);
+		super.destroy(level, pos, state);
 	}
 
 	@Override
-	public void neighborChanged(BlockState state, Level world, BlockPos pos, Block neighborBlock, BlockPos neighborPos, boolean isMoving)
+	protected void neighborChanged(BlockState state, Level world, BlockPos pos, Block neighborBlock, @Nullable Orientation orientation, boolean movedByPiston)
 	{
 		if (!world.isClientSide() &&
 			!neighborBlock.defaultBlockState().isAir() &&
@@ -91,19 +101,20 @@ public class BlockPortalFrame extends Block
 		{
 			// Deactivate all portals that share this frame block if an address block was removed or changed.
 
-			List<Portal> affectedPortals = PortalRegistry.getPortalsAt(pos, world.dimension());
+			List<Portal> affectedPortals = SimplePortals.portalRegistry.getPortalsAt(pos, world.dimension());
 
-			if (affectedPortals == null || affectedPortals.size() < 1) return;
-
-			Portal firstPortal = affectedPortals.get(0);
-			ServerLevel serverWorld = (ServerLevel)world;
-
-			if (firstPortal.hasAddressChanged(serverWorld))
+			if (!affectedPortals.isEmpty())
 			{
-				PortalRegistry.deactivatePortal(serverWorld, pos);
+				Portal firstPortal = affectedPortals.getFirst();
+				ServerLevel serverWorld = (ServerLevel)world;
+
+				if (firstPortal.hasAddressChanged(serverWorld))
+				{
+					SimplePortals.portalRegistry.deactivatePortal(serverWorld, pos);
+				}
 			}
 		}
 
-		super.neighborChanged(state, world, pos, neighborBlock, neighborPos, isMoving);
+		super.neighborChanged(state, world, pos, neighborBlock, orientation, movedByPiston);
 	}
 }

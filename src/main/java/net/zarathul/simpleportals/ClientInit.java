@@ -1,20 +1,15 @@
 package net.zarathul.simpleportals;
 
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;
+import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.core.Registry;
-import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceKey;
+import net.zarathul.simpleportals.SimplePortals.ConfigCommandPayload;
 import net.zarathul.simpleportals.commands.ConfigCommandMode;
 import net.zarathul.simpleportals.configuration.Config;
+import net.zarathul.simpleportals.configuration.ConfigValue;
 import net.zarathul.simpleportals.configuration.gui.ConfigGui;
 import net.zarathul.simpleportals.configuration.gui.ListCommandGui;
-import net.zarathul.simpleportals.configuration.gui.PortalInfo;
-import net.zarathul.simpleportals.registration.Address;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,7 +19,22 @@ public class ClientInit implements ClientModInitializer
 	@Override
 	public void onInitializeClient()
 	{
-		BlockRenderLayerMap.INSTANCE.putBlock(SimplePortals.blockPortal, RenderType.translucent());
+		//BlockRenderLayerMap.INSTANCE.putBlock(SimplePortals.blockPortal, RenderType.translucent());
+
+		ItemTooltipCallback.EVENT.register((stack, tooltipContext, tooltipFlag, lines) -> {
+			if (stack.getItem() == SimplePortals.itemPortalFrame)
+			{
+				SimplePortals.itemPortalFrame.addTooltip(stack, tooltipContext, tooltipFlag, lines);
+			}
+			else if (stack.getItem() == SimplePortals.itemPowerGauge)
+			{
+				SimplePortals.itemPowerGauge.addTooltip(stack, tooltipContext, tooltipFlag, lines);
+			}
+			else if (stack.getItem() == SimplePortals.itemPortalActivator)
+			{
+				SimplePortals.itemPortalActivator.addTooltip(stack, tooltipContext, tooltipFlag, lines);
+			}
+		});
 
 		// Register client side only commands. As of 1.18.2 the command tree here has to mirror the tree in CommandPortals, otherwise those commands won't work.
 		// As of 1.19.2 this seems no longer necessary.
@@ -112,7 +122,7 @@ public class ClientInit implements ClientModInitializer
 //				)
 //				.then(
 //					ClientCommandManager.literal("items")
-//				)
+//				)0
 //			)
 //			.then(
 //				ClientCommandManager.literal("cooldown")
@@ -129,32 +139,23 @@ public class ClientInit implements ClientModInitializer
 //		);
 
 		// Receiver for server side settings if a config command was issued.
-		ClientPlayNetworking.registerGlobalReceiver(SimplePortals.CONFIG_COMMAND_PACKET_ID, (minecraft, packetListener, receiveBuffer, sender) -> {
-			Config.readServerSettings(Settings.class, receiveBuffer, minecraft.player);
+		ClientPlayNetworking.registerGlobalReceiver(SimplePortals.ConfigCommandPayload.TYPE, (payload, ctx) -> {
+			Config.readServerSettings(Settings.class, payload.values(), ctx.player());
 
-			minecraft.execute(() -> minecraft.setScreen(new ConfigGui(Component.translatable("§nSimplePortals"), Settings.class, SimplePortals.MOD_ID, minecraft.player, player -> {
-				FriendlyByteBuf sendBuffer = PacketByteBufs.create();
-				sendBuffer.writeEnum(ConfigCommandMode.SetServerSettings);
-				Config.writeServerSettings(Settings.class, sendBuffer, player);
-				ClientPlayNetworking.send(SimplePortals.CONFIG_COMMAND_PACKET_ID, sendBuffer);
+			var client = ctx.client();
+			client.execute(() -> client.gui.setScreen(new ConfigGui(Component.translatable("§nSimplePortals"), Settings.class, SimplePortals.MOD_ID, client.player, player -> {
+				List<ConfigValue> configValues = new ArrayList<>();
+				Config.writeServerSettings(Settings.class, configValues, player);
+
+				ConfigCommandPayload outgoingPayload = new ConfigCommandPayload(ConfigCommandMode.SetServerSettings, configValues);
+				ClientPlayNetworking.send(outgoingPayload);
 			})));
 		});
 
 		// Receiver for portal data from the server if a list command was issued.
-		ClientPlayNetworking.registerGlobalReceiver(SimplePortals.LIST_COMMAND_PACKET_ID, (minecraft, packetListener, receiveBuffer, sender) -> {
-			List<PortalInfo> portals = receiveBuffer.readCollection(ArrayList::new, buffer -> {
-				PortalInfo portal = new PortalInfo();
-				portal.dimension = ResourceKey.create(Registry.DIMENSION_REGISTRY, buffer.readResourceLocation());	// dimension
-				portal.location = buffer.readBlockPos();															// location
-				Address address = new Address();																	// address
-				address.deserializeNBT(buffer.readNbt());
-				portal.address = address;
-				portal.power = buffer.readInt();																	// power
-
-				return portal;
-			});
-
-			minecraft.execute(() -> minecraft.setScreen(new ListCommandGui(portals)));
+		ClientPlayNetworking.registerGlobalReceiver(SimplePortals.ListCommandPayload.TYPE, (payload, ctx) -> {
+			var client = ctx.client();
+			client.execute(() -> client.gui.setScreen(new ListCommandGui(payload.portals())));
 		});
 	}
 }

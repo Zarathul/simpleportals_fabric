@@ -1,15 +1,18 @@
 package net.zarathul.simpleportals.configuration;
 
 import com.google.common.collect.Lists;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.permissions.Permission;
+import net.minecraft.server.permissions.PermissionLevel;
 import net.minecraft.world.entity.player.Player;
+import net.zarathul.simpleportals.configuration.gui.PortalInfo;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
+import java.lang.reflect.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -78,48 +81,66 @@ public final class Config
 		createConfig(configFilePath, clazz, false);
 	}
 
+	public static final StreamCodec<FriendlyByteBuf, List<ConfigValue>> LIST_STREAM_CODEC = new StreamCodec<FriendlyByteBuf, List<ConfigValue>>()
+	{
+		@Override
+		public List<ConfigValue> decode(FriendlyByteBuf input)
+		{
+			List<ConfigValue> values = input.readCollection(ArrayList::new, ConfigValue.STREAM_CODEC);
+			return values;
+		}
+
+		@Override
+		public void encode(FriendlyByteBuf output, List<ConfigValue> values)
+		{
+			output.writeCollection(values, ConfigValue.STREAM_CODEC);
+		}
+	};
+
 	/**
-	 * Writes the values of all non client-only settings, the player has the appropriate permission lvl for, into the passed in buffer.
+	 * Writes the values of all non client-only settings, the player has the appropriate permission lvl for, into the passed in list.
 	 * This is used for changing settings on a dedicated server remotely.
 	 */
-	public static void writeServerSettings(Class<?> clazz, FriendlyByteBuf buffer, Player player)
+	public static void writeServerSettings(Class<?> clazz, List<ConfigValue> configValues, Player player)
 	{
-		ConfigSetting annotation;
 		Field[] fields = getSettingFieldsSortedByCategory(clazz);
 
 		for (Field field : fields)
 		{
 			if (!isValidSetting(field)) continue;
 
-			annotation = field.getAnnotation(ConfigSetting.class);
-			if (annotation.clientOnly() || !player.hasPermissions(annotation.permissionLvl())) continue;
+			ConfigSetting annotation = field.getAnnotation(ConfigSetting.class);
+			var requiredPermissionLevel = PermissionLevel.byId(annotation.permissionLvl());
+			var requiredPermission = new Permission.HasCommandLevel(requiredPermissionLevel);
+
+			if (annotation.clientOnly() || !player.permissions().hasPermission(requiredPermission)) continue;
 
 			try
 			{
 				if (field.getType() == int.class)
 				{
-					buffer.writeInt(field.getInt(null));
+					configValues.add(new ConfigValue(ConfigValue.Type.Int, field.getInt(null)));
 				}
 				else if (field.getType() == float.class)
 				{
-					buffer.writeFloat(field.getFloat(null));
+					configValues.add(new ConfigValue(ConfigValue.Type.Float, field.getFloat(null)));
 				}
 				else if (field.getType() == boolean.class)
 				{
-					buffer.writeBoolean(field.getBoolean(null));
+					configValues.add(new ConfigValue(ConfigValue.Type.Boolean, field.getBoolean(null)));
 				}
 				else if (field.getType() == String.class)
 				{
-					buffer.writeUtf((String)field.get(null));
+					configValues.add(new ConfigValue(ConfigValue.Type.String, (String)field.get(null)));
 				}
 				else if (field.getType().isEnum())
 				{
-					buffer.writeInt(((Enum<?>)field.get(null)).ordinal());
+					configValues.add(new ConfigValue(ConfigValue.Type.Enum, ((Enum<?>)field.get(null)).ordinal()));
 				}
 				else
 				{
 					StorageMethods storage = getLoadSave(field).get();
-					buffer.writeUtf((String)storage.save.invoke(null, field.get(null)));
+					configValues.add(new ConfigValue(ConfigValue.Type.Complex, (String)storage.save.invoke(null, field.get(null))));
 				}
 			}
 			catch (IllegalAccessException | InvocationTargetException ignored) {}
@@ -127,58 +148,49 @@ public final class Config
 	}
 
 	/**
-	 * Reads the values of all non client-only settings, the player has the appropriate permission lvl for, from the passed in buffer.
-	 * It is assumed that the buffer was filled by calling {@link Config#writeServerSettings(Class, FriendlyByteBuf, Player)} and that
+	 * Reads the values of all non client-only settings, the player has the appropriate permission lvl for, from the passed in list.
+	 * It is assumed that the buffer was filled by calling {@link Config#writeServerSettings(Class, List, Player)} and that
 	 * the players permissions did not change between both calls.
 	 * This is used for changing settings on a dedicated server remotely.
 	 */
-	public static void readServerSettings(Class<?> clazz, FriendlyByteBuf buffer, Player player)
+	public static void readServerSettings(Class<?> clazz, List<ConfigValue> configValues, Player player)
 	{
-		ConfigSetting annotation;
 		Field[] fields = getSettingFieldsSortedByCategory(clazz);
+		int valueIndex = 0;
 
 		for (Field field : fields)
 		{
+			if (valueIndex >= configValues.size()) break;
 			if (!isValidSetting(field)) continue;
 
-			annotation = field.getAnnotation(ConfigSetting.class);
-			if (annotation.clientOnly() || !player.hasPermissions(annotation.permissionLvl())) continue;
+			ConfigSetting annotation = field.getAnnotation(ConfigSetting.class);
+			var requiredPermissionLevel = PermissionLevel.byId(annotation.permissionLvl());
+			var requiredPermission = new Permission.HasCommandLevel(requiredPermissionLevel);
+
+			if (annotation.clientOnly() || !player.permissions().hasPermission(requiredPermission)) continue;
 
 			Method validator = getValidator(field);
-			Object value;
 
 			try
 			{
-				if (field.getType() == int.class)
+				Object value;
+
+				if (isComplexType(field))
 				{
-					value = buffer.readInt();
-				}
-				else if (field.getType() == float.class)
-				{
-					value = buffer.readFloat();
-				}
-				else if (field.getType() == boolean.class)
-				{
-					value = buffer.readBoolean();
-				}
-				else if (field.getType() == String.class)
-				{
-					value = buffer.readUtf();
-				}
-				else if (field.getType().isEnum())
-				{
-					value = ((Enum<?>[])field.getType().getEnumConstants())[buffer.readInt()];
+					StorageMethods storage = getLoadSave(field).get();
+					value = storage.load.invoke(null, (String)configValues.get(valueIndex).value());
 				}
 				else
 				{
-					StorageMethods storage = getLoadSave(field).get();
-					value = storage.load.invoke(null, buffer.readUtf());
+					value = configValues.get(valueIndex).value();
 				}
 
 				field.set(null, value);
 				if ((validator != null) && (!(boolean)validator.invoke(null, value))) setToDefault(field);
 			}
 			catch (IllegalAccessException | InvocationTargetException ignored) {}
+
+			valueIndex++;
 		}
 	}
 

@@ -3,20 +3,22 @@ package net.zarathul.simpleportals.commands;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import net.minecraft.commands.CommandRuntimeException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.DimensionArgument;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.level.Level;
 import net.zarathul.simpleportals.Settings;
+import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.commands.arguments.BlockArgument;
 import net.zarathul.simpleportals.mixin.EntityAccessor;
 import net.zarathul.simpleportals.registration.Address;
@@ -28,6 +30,8 @@ import java.util.stream.Collectors;
 
 public class CommandPortals
 {
+	private static final SimpleCommandExceptionType ERROR_UNKNOWN_DIMENSION = new SimpleCommandExceptionType(Component.translatable("commands.errors.unknown_sender_dimension"));
+
 	private enum DeactivateMode
 	{
 		Address,
@@ -45,9 +49,11 @@ public class CommandPortals
 	public static void register(CommandDispatcher<CommandSourceStack> dispatcher)
 	{
 		// As of 1.18.2 because the config and list subcommands are client-side only, the whole command tree has to be mirrored in ClientInit.
+		// As of 1.19.2 this seems no longer necessary.
+		// TODO: Remove comment if no longer needed.
 
 		dispatcher.register(
-			Commands.literal("sportals").requires((commandSource) -> commandSource.hasPermission(4))
+			Commands.literal("sportals").requires((commandSource) -> commandSource.permissions().hasPermission(Permissions.COMMANDS_OWNER))
 			.executes(context -> {
 				SendTranslatedMessage(context.getSource(), "commands.sportals.info");
 				return 1;
@@ -154,11 +160,11 @@ public class CommandPortals
 				.then(
 					Commands.literal("items")
 					.executes(context -> {
-						var powerTag = Registry.ITEM.getTag(Settings.powerSourceTag);
+						var powerTag = BuiltInRegistries.ITEM.get(Settings.powerSourceTag);
 
 						if (powerTag.isEmpty())
 						{
-							SendTranslatedMessage(context.getSource(), "commands.errors.no_power_items", Settings.powerSource);
+							SendTranslatedMessage(context.getSource(), "commands.errors.no_power_items", Settings.powerSource.toString());
 							return 1;
 						}
 
@@ -197,7 +203,7 @@ public class CommandPortals
 		);
 	}
 
-	private static int deactivate(CommandSourceStack source, DeactivateMode mode, Address address, BlockPos pos, ServerLevel dimensionLevel)
+	private static int deactivate(CommandSourceStack source, DeactivateMode mode, Address address, BlockPos pos, ServerLevel dimensionLevel) throws CommandSyntaxException
 	{
 		List<Portal> portals = null;
 
@@ -205,13 +211,13 @@ public class CommandPortals
 		{
 			case Address:
 				// sportals deactivate <addressBlockId> <addressBlockId> <addressBlockId> <addressBlockId> [dimension]
-				portals = PortalRegistry.getPortalsWithAddress(address);
+				portals = SimplePortals.portalRegistry.getPortalsWithAddress(address);
 
 				if (portals == null || portals.size() == 0)
 				{
 					if (dimensionLevel != null)
 					{
-						SendTranslatedMessage(source, "commands.errors.portal_not_found_with_address_in_dimension", address, dimensionLevel.dimension().location());
+						SendTranslatedMessage(source, "commands.errors.portal_not_found_with_address_in_dimension", address, dimensionLevel.dimension().identifier().toString());
 					}
 					else
 					{
@@ -225,7 +231,7 @@ public class CommandPortals
 				{
 					// filter out all portals that are not in the specified dimension
 					final ResourceKey<Level> dimensionCopy = dimensionLevel.dimension();	// This is necessary because Java wants closures in lambda expressions to be effectively final.
-					portals = portals.stream().filter((portal -> portal.getDimension() == dimensionCopy)).collect(Collectors.toList());
+					portals = portals.stream().filter((portal -> portal.dimension() == dimensionCopy)).collect(Collectors.toList());
 				}
 
 				break;
@@ -240,11 +246,11 @@ public class CommandPortals
 					{
 						// Get the dimension the command sender is currently in.
 						ServerPlayer player = source.getPlayerOrException();
-						dimension = player.level.dimension();
+						dimension = player.level().dimension();
 					}
 					catch (CommandSyntaxException ex)
 					{
-						throw new CommandRuntimeException(Component.translatable("commands.errors.unknown_sender_dimension"));
+						throw new SimpleCommandExceptionType(Component.translatable("commands.errors.unknown_sender_dimension")).create();
 					}
 				}
 				else
@@ -252,8 +258,8 @@ public class CommandPortals
 					dimension = dimensionLevel.dimension();
 				}
 
-				portals = PortalRegistry.getPortalsAt(pos, dimension);
-				if (portals == null || portals.size() == 0)	throw new CommandRuntimeException(Component.translatable("commands.errors.portal_not_found_at_pos_in_dimension", pos.getX(), pos.getY(), pos.getZ(), dimension.location()));
+				portals = SimplePortals.portalRegistry.getPortalsAt(pos, dimension);
+				if (portals == null || portals.isEmpty()) throw new SimpleCommandExceptionType(Component.translatable("commands.errors.portal_not_found_at_pos_in_dimension", pos.getX(), pos.getY(), pos.getZ(), dimension.identifier())).create();
 
 				break;
 		}
@@ -263,18 +269,18 @@ public class CommandPortals
 
 		for (Portal portal : portals)
 		{
-			portalPos = portal.getCorner1().getPos();
-			dimensionServer = source.getServer().getLevel(portal.getDimension());
-			if (dimensionServer == null) throw new CommandRuntimeException(Component.translatable("commands.errors.missing_dimension", portal.getDimension().location()));
+			portalPos = portal.corner1().pos();
+			dimensionServer = source.getServer().getLevel(portal.dimension());
+			if (dimensionServer == null) throw new SimpleCommandExceptionType(Component.translatable("commands.errors.missing_dimension", portal.dimension().identifier())).create();
 
-			PortalRegistry.deactivatePortal(dimensionServer, portalPos);
-			SendTranslatedMessage(source, "commands.sportals.deactivate.success", portalPos.getX(), portalPos.getY(), portalPos.getZ(), portal.getDimension().location());
+			SimplePortals.portalRegistry.deactivatePortal(dimensionServer, portalPos);
+			SendTranslatedMessage(source, "commands.sportals.deactivate.success", portalPos.getX(), portalPos.getY(), portalPos.getZ(), portal.dimension().identifier().toString());
 		}
 
 		return 1;
 	}
 
-	private static int power(CommandSourceStack source, PowerMode mode, int amount, BlockPos pos, ServerLevel dimensionLevel)
+	private static int power(CommandSourceStack source, PowerMode mode, int amount, BlockPos pos, ServerLevel dimensionLevel) throws CommandSyntaxException
 	{
 		ResourceKey<Level> dimension;
 
@@ -284,11 +290,11 @@ public class CommandPortals
 			try
 			{
 				ServerPlayer player = source.getPlayerOrException();
-				dimension = player.level.dimension();
+				dimension = player.level().dimension();
 			}
 			catch (CommandSyntaxException ex)
 			{
-				throw new CommandRuntimeException(Component.translatable("commands.errors.unknown_sender_dimension"));
+				throw new SimpleCommandExceptionType(Component.translatable("commands.errors.unknown_sender_dimension")).create();
 			}
 		}
 		else
@@ -296,41 +302,41 @@ public class CommandPortals
 			dimension = dimensionLevel.dimension();
 		}
 
-		List<Portal> portals = PortalRegistry.getPortalsAt(pos, dimension);
+		List<Portal> portals = SimplePortals.portalRegistry.getPortalsAt(pos, dimension);
 
-		if (portals == null || portals.size() == 0)
+		if (portals == null || portals.isEmpty())
 		{
-			throw new CommandRuntimeException(Component.translatable("commands.errors.portal_not_found_at_pos_in_dimension", pos.getX(), pos.getY(), pos.getZ(), dimension.location()));
+			throw new SimpleCommandExceptionType(Component.translatable("commands.errors.portal_not_found_at_pos_in_dimension", pos.getX(), pos.getY(), pos.getZ(), dimension.identifier())).create();
 		}
 		else if (portals.size() > 1)
 		{
-			throw new CommandRuntimeException(Component.translatable("commands.errors.multiple_portals_found_at_pos_in_dimension", pos.getX(), pos.getY(), pos.getZ(), dimension.location()));
+			throw new SimpleCommandExceptionType(Component.translatable("commands.errors.multiple_portals_found_at_pos_in_dimension", pos.getX(), pos.getY(), pos.getZ(), dimension.identifier())).create();
 		}
 
-		Portal portal = portals.get(0);
+		Portal portal = portals.getFirst();
 		ServerLevel portalLevel = source.getServer().getLevel(dimension);
 
 		switch (mode)
 		{
 			case Add:
 				// sportals power add <amount> <x> <y> <z> [dimension]
-				amount = amount - PortalRegistry.addPower(portal, amount);
-				PortalRegistry.updatePowerGauges(portalLevel, portal);
-				SendTranslatedMessage(source, "commands.sportals.power.add.success", amount, pos.getX(), pos.getY(), pos.getZ(), dimension.location());
+				amount = amount - SimplePortals.portalRegistry.addPower(portal, amount);
+				SimplePortals.portalRegistry.updatePowerGauges(portalLevel, portal);
+				SendTranslatedMessage(source, "commands.sportals.power.add.success", amount, pos.getX(), pos.getY(), pos.getZ(), dimension.identifier().toString());
 				break;
 
 			case Remove:
 				// sportals power remove <amount> <x> <y> <z> [dimension]
-				amount = Math.min(amount, PortalRegistry.getPower(portal));
-				amount = (PortalRegistry.removePower(portal, amount)) ? amount : 0;
-				PortalRegistry.updatePowerGauges(portalLevel, portal);
-				SendTranslatedMessage(source, "commands.sportals.power.remove.success", amount, pos.getX(), pos.getY(), pos.getZ(), dimension.location());
+				amount = Math.min(amount, SimplePortals.portalRegistry.getPortalPower(portal));
+				amount = (SimplePortals.portalRegistry.removePower(portal, amount)) ? amount : 0;
+				SimplePortals.portalRegistry.updatePowerGauges(portalLevel, portal);
+				SendTranslatedMessage(source, "commands.sportals.power.remove.success", amount, pos.getX(), pos.getY(), pos.getZ(), dimension.identifier().toString());
 				break;
 
 			case Get:
 				// sportals power get <x> <y> <z> [dimension]
-				amount = PortalRegistry.getPower(portal);
-				SendTranslatedMessage(source, "commands.sportals.power.get.success", pos.getX(), pos.getY(), pos.getZ(), dimension.location(), amount);
+				amount = SimplePortals.portalRegistry.getPortalPower(portal);
+				SendTranslatedMessage(source, "commands.sportals.power.get.success", pos.getX(), pos.getY(), pos.getZ(), dimension.identifier().toString(), amount);
 				break;
 		}
 
@@ -349,7 +355,7 @@ public class CommandPortals
 	private static int clear(CommandSourceStack source)
 	{
 		// sportals clear confirmed
-		PortalRegistry.clear();
+		SimplePortals.portalRegistry.clear();
 		SendTranslatedMessage(source, "commands.sportals.clear.success");
 
 		return 1;
@@ -357,6 +363,6 @@ public class CommandPortals
 
 	private static void SendTranslatedMessage(CommandSourceStack source, String message, Object... args)
 	{
-		source.sendSuccess(Component.translatable(message, args), false);
+		source.sendSuccess(() -> Component.translatable(message, args), false);
 	}
 }

@@ -1,7 +1,10 @@
 package net.zarathul.simpleportals;
 
-import net.minecraft.core.Registry;
-import net.minecraft.resources.ResourceLocation;
+import net.fabricmc.fabric.api.event.registry.FabricRegistry;
+import net.fabricmc.fabric.api.recipe.v1.FabricRecipeManager;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.zarathul.simpleportals.configuration.ConfigSetting;
@@ -49,34 +52,32 @@ public final class Settings
 	}
 
 	@ConfigSetting(descriptionKey = "power_source", description = "The tag that items must have to be able to power portals (1 power per item).", category = "common", permissionLvl = 4)
-	public static ResourceLocation powerSource;
-	public static final ResourceLocation powerSourceDefault = new ResourceLocation("c:ender_pearls");
-	public static ResourceLocation powerSourceLoad(String value)
+	public static Identifier powerSource;
+	public static final Identifier powerSourceDefault = Identifier.parse("c:ender_pearls");
+	public static Identifier powerSourceLoad(String value)
 	{
-		return ResourceLocation.tryParse(value);
+		return Identifier.tryParse(value);
 	}
-	public static String powerSourceSave(ResourceLocation value)
+	public static String powerSourceSave(Identifier value)
 	{
 		return value.toString();
 	}
-	public static boolean powerSourceValidator(ResourceLocation value)
+	public static boolean powerSourceValidator(Identifier sourceId)
 	{
 		// When the config file is first loaded, data-packs (including tags) are not loaded yet.
 		// Without the tag list there is no way to check if a ResourceLocation is valid, so accept them all.
 		// Without doing this, a value for powerSource could never be loaded from the config file, because
 		// it would always be invalid.
-		if (Registry.ITEM.getTagNames().findAny().isEmpty()) return true;
+		if (BuiltInRegistries.ITEM.getTags().findAny().isEmpty()) return true;
 
 		// Check if the passed ResourceLocation corresponds to a valid tag and cache the result for later use.
 		// Note: Registry.ITEM.getTag() doesn't find anything with a new'd TagKey as an argument, that's why
 		// the registry is searched manually here.
-		var searchResult = Registry.ITEM.getTagNames().filter(name -> {
-			return (name.location().equals(value));
-		}).findAny();
+		var searchResult = BuiltInRegistries.ITEM.getTags().filter(namedItem -> namedItem.key().location().equals(sourceId)).findAny();
 
 		if (searchResult.isPresent())
 		{
-			powerSourceTag = searchResult.get();
+			powerSourceTag = searchResult.get().key();
 			return true;
 		}
 

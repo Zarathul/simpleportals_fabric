@@ -1,7 +1,10 @@
 package net.zarathul.simpleportals.registration;
 
 import com.google.common.base.Strings;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.Identifier;
 
 import java.util.Map;
 import java.util.Map.Entry;
@@ -16,6 +19,11 @@ import java.util.function.BiConsumer;
  */
 public class Address
 {
+	public static final Codec<Address> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+			Codec.unboundedMap(Codec.STRING, Codec.INT).fieldOf("blockCounts").forGetter(Address::getBlockCounts)
+		).apply(instance, Address::new)
+	);
+
 	private static final int LENGTH = 4;
 	
 	private String readableName;
@@ -26,12 +34,29 @@ public class Address
 	{
 		blockCounts = new TreeMap<>();
 	}
+
+	public Address(Map<String, Integer> blockCounts)
+	{
+		this.blockCounts = blockCounts;
+		generateReadableName();
+	}
 	
 	public Address(String ... blockIds)
 	{
 		this();
 		initBlockCounts(blockIds);
 		generateReadableName();
+	}
+
+	/**
+	 * Gets all the counts for all blocks in the address.
+	 *
+	 * @return
+	 * A map of {@link Identifier} strings to counts.
+	 */
+	public Map<String, Integer> getBlockCounts()
+	{
+		return blockCounts;
 	}
 	
 	/**
@@ -65,35 +90,35 @@ public class Address
 	{
 		CompoundTag mainTag = new CompoundTag();
 		CompoundTag countTag;
-		
+
 		int i = 0;
-		
+
 		for (Entry<String, Integer> blockCount : blockCounts.entrySet())
 		{
 			countTag = new CompoundTag();
 			countTag.putString("id", blockCount.getKey());
 			countTag.putInt("count", blockCount.getValue());
-			
+
 			mainTag.put(String.valueOf(i++), countTag);
 		}
-		
+
 		return mainTag;
 	}
 	
 	public void deserializeNBT(CompoundTag nbt)
 	{
 		if (nbt == null) return;
-		
+
 		int i = 0;
 		String key;
 		CompoundTag countTag;
-		
+
 		while (nbt.contains(key = String.valueOf(i++)))
 		{
-			countTag = nbt.getCompound(key);
-			blockCounts.put(countTag.getString("id"), countTag.getInt("count"));
+			countTag = nbt.getCompound(key).get();
+			blockCounts.put(countTag.getString("id").get(), countTag.getInt("count").get());
 		}
-		
+
 		generateReadableName();
 	}
 	

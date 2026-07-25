@@ -15,16 +15,19 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.InsideBlockEffectApplier;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
-import net.minecraft.world.level.material.Material;
+import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.phys.shapes.BooleanOp;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
@@ -32,13 +35,13 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import net.zarathul.simpleportals.Settings;
 import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.common.TeleportTask;
-import net.zarathul.simpleportals.common.Utils;
 import net.zarathul.simpleportals.mixin.EntityAccessor;
 import net.zarathul.simpleportals.registration.Portal;
 import net.zarathul.simpleportals.registration.PortalRegistry;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -55,12 +58,14 @@ public class BlockPortal extends Block
 		Axis.class,
 		Axis.X, Axis.Y, Axis.Z);
 
-	public BlockPortal()
+	public BlockPortal(ResourceKey<Block> id)
 	{
-		super(Properties.of(Material.PORTAL)
+		super(Properties.of()
+			.setId(id)
 			.noLootTable()
-			.noCollission()
+			.noCollision()
 			.strength(-1.0F) // indestructible by normal means
+			.pushReaction(PushReaction.BLOCK)
 			.lightLevel((state) -> 11)
 			.sound(SoundType.GLASS));
 	}
@@ -87,9 +92,9 @@ public class BlockPortal extends Block
 	}
 
 	@Override
-	public void entityInside(BlockState state, Level world, BlockPos pos, Entity entity)
+	protected void entityInside(BlockState state, Level world, BlockPos pos, Entity entity, InsideBlockEffectApplier effectApplier, boolean isPrecise)
 	{
-		if (!world.isClientSide() && entity.isAlive() && !entity.isPassenger() && !entity.isVehicle() && entity.canChangeDimensions() &&
+		if (!world.isClientSide() && entity.isAlive() && !entity.isPassenger() && !entity.isVehicle() && entity.canUsePortal(false) &&
 			Shapes.joinIsNotEmpty(Shapes.create(entity.getBoundingBox().move(-pos.getX(), -pos.getY(), -pos.getZ())), state.getShape(world, pos), BooleanOp.AND))
 		{
 			// For players a configurable cooldown is used instead of the value provided by getPortalCooldown(), because
@@ -98,14 +103,21 @@ public class BlockPortal extends Block
 			int cooldown = (entity instanceof ServerPlayer) ? Settings.playerTeleportationCooldown : entity.getDimensionChangingDelay();
 			if (entity.isOnPortalCooldown()) return;
 
-			List<Portal> portals = PortalRegistry.getPortalsAt(pos, entity.level.dimension());
-			
-			if (portals == null || portals.size() < 1) return;
+			Level entityLevel = null;
+			try (var level = entity.level())
+			{
+				entityLevel = level;
+			}
+			catch (Exception _) { return; }
 
-			MinecraftServer mcServer = entity.getServer();
+			List<Portal> portals = SimplePortals.portalRegistry.getPortalsAt(pos, entityLevel.dimension());
+			
+			if (portals == null || portals.isEmpty()) return;
+
+			MinecraftServer mcServer = entityLevel.getServer();
 			if (mcServer == null) return;
 
-			Portal start = portals.get(0);
+			Portal start = portals.getFirst();
 
 			// Handle power source entering the portal
 			
@@ -119,11 +131,11 @@ public class BlockPortal extends Block
 					return;
 				}
 
-				if ((PortalRegistry.getPower(start) < Settings.powerCapacity) && itemStack.is(Settings.powerSourceTag))
+				if ((SimplePortals.portalRegistry.getPortalPower(start) < Settings.powerCapacity) && itemStack.is(Settings.powerSourceTag))
 				{
-					int surplus = PortalRegistry.addPower(start, itemStack.getCount());
+					int surplus = SimplePortals.portalRegistry.addPower(start, itemStack.getCount());
 
-					PortalRegistry.updatePowerGauges((ServerLevel)world, start);
+					SimplePortals.portalRegistry.updatePowerGauges((ServerLevel)world, start);
 					
 					if (surplus > 0)
 					{
@@ -142,9 +154,9 @@ public class BlockPortal extends Block
 			boolean bypassPowerCost = (entity instanceof ServerPlayer && ((ServerPlayer)entity).isCreative());
 			
 			// Check if portal has enough power for a port
-			if (!bypassPowerCost && PortalRegistry.getPower(start) < Settings.powerCost) return;
+			if (!bypassPowerCost && SimplePortals.portalRegistry.getPortalPower(start) < Settings.powerCost) return;
 			
-			portals = PortalRegistry.getPortalsWithAddress(start.getAddress());
+			portals = SimplePortals.portalRegistry.getPortalsWithAddress(start.address());
 			
 			if (portals == null || portals.size() < 2) return;
 			
@@ -153,20 +165,20 @@ public class BlockPortal extends Block
 				.filter(e -> !e.equals(start))
 				.collect(Collectors.toList());
 			
-			if (destinations.size() > 0)
+			if (!destinations.isEmpty())
 			{
 				Collections.shuffle(destinations);
 
 				int entityHeight = Mth.ceil(entity.getBbHeight());
-				ServerLevel destinationWorld;
-				ResourceKey<Level> dimension;
+				ServerLevel destinationWorld = null;
+				ResourceKey<Level> dimension = null;
 				BlockPos destinationPos = null;
 				Portal destinationPortal = null;
 
 				// Pick the first not blocked destination portal
 				for (Portal portal : destinations)
 				{
-					dimension = portal.getDimension();
+					dimension = portal.dimension();
 					if (dimension == null) continue;
 
 					destinationWorld = mcServer.getLevel(dimension);
@@ -179,18 +191,18 @@ public class BlockPortal extends Block
 					}
 				}
 				
-				if ((destinationPos != null) && (bypassPowerCost || Settings.powerCost == 0 || PortalRegistry.removePower(start, Settings.powerCost)))
+				if ((destinationPos != null && destinationWorld != null) && (bypassPowerCost || Settings.powerCost == 0 || SimplePortals.portalRegistry.removePower(start, Settings.powerCost)))
 				{
 					// Get a facing pointing away from the destination portal. After porting, the portal 
 					// will always be behind the entity. When porting to a horizontal portal the initial
 					// facing is not changed.
-					Direction entityFacing = (destinationPortal.getAxis() == Axis.Y)
+					Direction entityFacing = (destinationPortal.axis() == Axis.Y)
 						? entity.getDirection()
-						: (destinationPortal.getAxis() == Axis.Z)
-						? (destinationPos.getZ() > destinationPortal.getCorner1().getPos().getZ())
+						: (destinationPortal.axis() == Axis.Z)
+						? (destinationPos.getZ() > destinationPortal.corner1().pos().getZ())
 						? Direction.SOUTH
 						: Direction.NORTH
-						: (destinationPos.getX() > destinationPortal.getCorner1().getPos().getX())
+						: (destinationPos.getX() > destinationPortal.corner1().pos().getX())
 						? Direction.EAST
 						: Direction.WEST;
 					
@@ -207,7 +219,7 @@ public class BlockPortal extends Block
 							SimplePortals.TELEPORT_QUEUE.put(new TeleportTask(
 									mcServer.getTickCount(),
 									(ServerPlayer)entity,
-									destinationPortal.getDimension(),
+									destinationPortal.dimension(),
 									destinationPos,
 									entityFacing));
 						}
@@ -215,15 +227,25 @@ public class BlockPortal extends Block
 						{
 							SimplePortals.log.error("Failed to enqueue teleportation task for player '{}' to dimension '{}'.",
 													entity.getName(),
-													destinationPortal.getDimension());
+													destinationPortal.dimension());
 						}
 					}
 					else
 					{
-						entity = Utils.teleportTo(entity, destinationPortal.getDimension(), destinationPos, entityFacing);
+//						entity = Utils.teleportTo(entity, destinationPortal.getDimension(), destinationPos, entityFacing);
+						entity.teleportTo(
+							mcServer.getLevel(destinationPortal.dimension()),
+							destinationPos.getX(),
+							destinationPos.getY(),
+							destinationPos.getZ(),
+							Set.of(),
+							entity.getXRot(),
+							entity.getYRot(),
+							false
+						);
 					}
 
-					PortalRegistry.updatePowerGauges((ServerLevel)world, start);
+					SimplePortals.portalRegistry.updatePowerGauges((ServerLevel)world, start);
 				}
 			}
 
@@ -233,29 +255,31 @@ public class BlockPortal extends Block
 	}
 
 	@Override
-	public void onRemove(BlockState oldState, Level world, BlockPos pos, BlockState newState, boolean isMoving)
+	public void destroy(LevelAccessor level, BlockPos pos, BlockState state)
 	{
-		if (!world.isClientSide())
+		if (!level.isClientSide())
 		{
 			// Deactivate damaged portals.
+
+			ServerLevel serverLevel = (ServerLevel)level;
+			List<Portal> affectedPortals = SimplePortals.portalRegistry.getPortalsAt(pos, serverLevel.dimension());
 			
-			List<Portal> affectedPortals = PortalRegistry.getPortalsAt(pos, world.dimension());
+			if (affectedPortals.isEmpty()) return;
 			
-			if (affectedPortals == null || affectedPortals.size() < 1) return;
-			
-			Portal firstPortal = affectedPortals.get(0);
-			ServerLevel serverWorld = (ServerLevel)world;
-			
-			if (firstPortal.isDamaged(serverWorld))
+			Portal firstPortal = affectedPortals.getFirst();
+
+			if (firstPortal.isDamaged(serverLevel))
 			{
-				PortalRegistry.deactivatePortal(serverWorld, pos);
+				SimplePortals.portalRegistry.deactivatePortal(serverLevel, pos);
 			}
 		}
+
+		super.destroy(level, pos, state);
 	}
 
 	@Override
 	@Environment(EnvType.CLIENT)
-	public ItemStack getCloneItemStack(BlockGetter getter, BlockPos pos, BlockState state)
+	protected ItemStack getCloneItemStack(LevelReader level, BlockPos pos, BlockState state, boolean includeData)
 	{
 		return ItemStack.EMPTY;
 	}

@@ -1,16 +1,22 @@
 package net.zarathul.simpleportals.registration;
 
 import com.google.common.collect.*;
+import com.mojang.datafixers.util.Pair;
+import com.mojang.serialization.*;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
-import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
 import net.zarathul.simpleportals.Settings;
 import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.blocks.BlockPortal;
@@ -22,16 +28,111 @@ import java.util.stream.Collectors;
 /**
  * The central registration for all portals.
  */
-public final class PortalRegistry
+public final class PortalRegistry extends SavedData
 {
-	private static final ImmutableMap<Direction,Direction[]> cornerSearchDirs;
-	private static final ListMultimap<BlockPos, Portal> portals;
-	private static final ListMultimap<Address, Portal> addresses;
-	private static final ListMultimap<Portal, BlockPos> gauges;
-	private static final HashMap<Portal, Integer> power;
-	
-	static
+	public record PortalEntry(BlockPos pos, Portal portal)
 	{
+		public static final Codec<PortalEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+			BlockPos.CODEC.fieldOf("pos").forGetter(PortalEntry::pos),
+			Portal.CODEC.fieldOf("portal").forGetter(PortalEntry::portal)
+		).apply(instance, PortalEntry::new));
+	}
+
+	public record AddressEntry(Address address, Portal portal)
+	{
+		public static final Codec<AddressEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+			Address.CODEC.fieldOf("address").forGetter(AddressEntry::address),
+			Portal.CODEC.fieldOf("portal").forGetter(AddressEntry::portal)
+		).apply(instance, AddressEntry::new));
+	}
+
+	public record GaugeEntry(Portal portal, BlockPos pos)
+	{
+		public static final Codec<GaugeEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+			Portal.CODEC.fieldOf("portal").forGetter(GaugeEntry::portal),
+			BlockPos.CODEC.fieldOf("pos").forGetter(GaugeEntry::pos)
+		).apply(instance, GaugeEntry::new));
+	}
+
+	public record PowerEntry(Portal portal, int power)
+	{
+		public static final Codec<PowerEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+			Portal.CODEC.fieldOf("portal").forGetter(PowerEntry::portal),
+			Codec.INT.fieldOf("power").forGetter(PowerEntry::power)
+		).apply(instance, PowerEntry::new));
+	}
+
+	public static final Codec<PortalRegistry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+			Codec.list(PortalEntry.CODEC).fieldOf("portals").forGetter(PortalRegistry::portals),
+			Codec.list(AddressEntry.CODEC).fieldOf("addresses").forGetter(PortalRegistry::addresses),
+			Codec.list(GaugeEntry.CODEC).fieldOf("gauges").forGetter(PortalRegistry::gauges),
+			Codec.list(PowerEntry.CODEC).fieldOf("power").forGetter(PortalRegistry::power)
+		).apply(instance, PortalRegistry::new)
+	);
+
+	public static final SavedDataType<PortalRegistry> TYPE = new SavedDataType<>(Identifier.fromNamespaceAndPath(SimplePortals.MOD_ID, "portal_registry"), PortalRegistry::new, CODEC, null	);
+
+	private final ImmutableMap<Direction,Direction[]> cornerSearchDirs;
+	private final ListMultimap<BlockPos, Portal> portals;
+	private final ListMultimap<Address, Portal> addresses;
+	private final ListMultimap<Portal, BlockPos> gauges;
+	private final HashMap<Portal, Integer> power;
+
+	public List<PortalEntry> portals()
+	{
+		var portalEntries = new ArrayList<PortalEntry>(portals.size());
+		portals.forEach((blockPos, portal) -> portalEntries.add(new PortalEntry(blockPos, portal)));
+
+		return portalEntries;
+	}
+
+	public List<AddressEntry> addresses()
+	{
+		var addressEntries = new ArrayList<AddressEntry>(addresses.size());
+		addresses.forEach((address, portal) -> addressEntries.add(new AddressEntry(address, portal)));
+
+		return addressEntries;
+	}
+
+	public List<GaugeEntry> gauges()
+	{
+		var gaugeEntries = new ArrayList<GaugeEntry>(gauges.size());
+		gauges.forEach((portal, blockPos) -> gaugeEntries.add(new GaugeEntry(portal, blockPos)));
+
+		return gaugeEntries;
+	}
+
+	public List<PowerEntry> power()
+	{
+		var powerEntries = new ArrayList<PowerEntry>(power.size());
+		power.forEach((portal, integer) -> powerEntries.add(new PowerEntry(portal, integer)));
+
+		return powerEntries;
+	}
+
+	public PortalRegistry()
+	{
+		this(new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
+
+//		EnumMap<Direction,Direction[]> temp = Maps.newEnumMap(Direction.class);
+//		temp.put(Direction.DOWN, new Direction[] { Direction.SOUTH, Direction.EAST });
+//		temp.put(Direction.UP, new Direction[] { Direction.SOUTH, Direction.EAST });
+//		temp.put(Direction.NORTH, new Direction[] { Direction.DOWN, Direction.EAST });
+//		temp.put(Direction.SOUTH, new Direction[] { Direction.DOWN, Direction.EAST });
+//		temp.put(Direction.WEST, new Direction[] { Direction.DOWN, Direction.SOUTH });
+//		temp.put(Direction.EAST, new Direction[] { Direction.DOWN, Direction.SOUTH });
+//		cornerSearchDirs = Maps.immutableEnumMap(temp);
+//
+//		portals = ArrayListMultimap.create();
+//		addresses = ArrayListMultimap.create();
+//		gauges = ArrayListMultimap.create();
+//		power = Maps.newHashMap();
+	}
+
+	public PortalRegistry(List<PortalEntry> portals, List<AddressEntry> addresses, List<GaugeEntry> gauges, List<PowerEntry> power)
+	{
+		// CopyPasta from the default constructor, because calling 'this()' would also initialize all the maps.
+		// Factoring out the initialization is also not an option, because the 'cornerSearchDirs' field is final.
 		EnumMap<Direction,Direction[]> temp = Maps.newEnumMap(Direction.class);
 		temp.put(Direction.DOWN, new Direction[] { Direction.SOUTH, Direction.EAST });
 		temp.put(Direction.UP, new Direction[] { Direction.SOUTH, Direction.EAST });
@@ -40,25 +141,32 @@ public final class PortalRegistry
 		temp.put(Direction.WEST, new Direction[] { Direction.DOWN, Direction.SOUTH });
 		temp.put(Direction.EAST, new Direction[] { Direction.DOWN, Direction.SOUTH });
 		cornerSearchDirs = Maps.immutableEnumMap(temp);
-		
-		portals = ArrayListMultimap.create();
-		addresses = ArrayListMultimap.create();
-		gauges = ArrayListMultimap.create();
-		power = Maps.newHashMap();
+
+		this.portals = ArrayListMultimap.create();
+		portals.forEach(portalEntry -> this.portals.put(portalEntry.pos, portalEntry.portal));
+
+		this.addresses = ArrayListMultimap.create();
+		addresses.forEach(addressEntry -> this.addresses.put(addressEntry.address, addressEntry.portal));
+
+		this.gauges = ArrayListMultimap.create();
+		gauges.forEach(gaugeEntry -> this.gauges.put(gaugeEntry.portal, gaugeEntry.pos));
+
+		this.power = Maps.newHashMap();
+		power.forEach(powerEntry -> this.power.put(powerEntry.portal, powerEntry.power));
 	}
 
 	/**
 	 * :WARNING: Completely clears the registry. :WARNING:
 	 * This does not deactivate any portals, meaning no portals blocks will get removed.
 	 */
-	public static void clear()
+	public void clear()
 	{
 		portals.clear();
 		addresses.clear();
 		gauges.clear();
 		power.clear();
 
-		SimplePortals.portalSaveData.setDirty();
+		setDirty();
 	}
 	
 	/**
@@ -73,7 +181,7 @@ public final class PortalRegistry
 	 * @return
 	 * <code>true</code> if a portal could be activated, otherwise <code>false</code>.
 	 */
-	public static boolean activatePortal(ServerLevel world, BlockPos pos, Direction side)
+	public boolean activatePortal(ServerLevel world, BlockPos pos, Direction side)
 	{
 		if (world == null || pos == null || side == null) return false;
 		
@@ -103,49 +211,49 @@ public final class PortalRegistry
 		
 		if (corner2 == null) return false;
 		
-		corner3 = findCorner(world, corner1.getPos().offset(side.getNormal()), side, firstSearchDir.getOpposite());
+		corner3 = findCorner(world, corner1.pos().offset(side.getUnitVec3i()), side, firstSearchDir.getOpposite());
 		
 		if (corner3 == null) return false;
 		
-		corner4 = findCorner(world, corner3.getPos().offset(firstSearchDir.getOpposite().getNormal()), firstSearchDir.getOpposite(), side.getOpposite());
+		corner4 = findCorner(world, corner3.pos().offset(firstSearchDir.getOpposite().getUnitVec3i()), firstSearchDir.getOpposite(), side.getOpposite());
 		
-		if (corner4 == null || !corner4.equals(findCorner(world, corner2.getPos().offset(side.getNormal()), side, firstSearchDir))) return false;
+		if (corner4 == null || !corner4.equals(findCorner(world, corner2.pos().offset(side.getUnitVec3i()), side, firstSearchDir))) return false;
 		
 		// Check size
 		
-		if (getDistance(corner1.getPos(), corner2.getPos()) > Settings.maxSize
-			|| getDistance(corner1.getPos(), corner3.getPos()) > Settings.maxSize) return false;
+		if (getDistance(corner1.pos(), corner2.pos()) > Settings.maxSize
+			|| getDistance(corner1.pos(), corner3.pos()) > Settings.maxSize) return false;
 		
 		// Check address blocks validity
 		
-		BlockState addBlock1 = world.getBlockState(corner1.getPos());
+		BlockState addBlock1 = world.getBlockState(corner1.pos());
 		
 		if (!isValidAddressBlock(addBlock1)) return false;
 		
-		BlockState addBlock2 = world.getBlockState(corner2.getPos());
+		BlockState addBlock2 = world.getBlockState(corner2.pos());
 		
 		if (!isValidAddressBlock(addBlock2)) return false;
 		
-		BlockState addBlock3 = world.getBlockState(corner3.getPos());
+		BlockState addBlock3 = world.getBlockState(corner3.pos());
 		
 		if (!isValidAddressBlock(addBlock3)) return false;
 		
-		BlockState addBlock4 = world.getBlockState(corner4.getPos());
+		BlockState addBlock4 = world.getBlockState(corner4.pos());
 		
 		if (!isValidAddressBlock(addBlock4)) return false;
 		
 		// Determine portal axis
 		
-		int corner1Y = corner1.getPos().getY();
+		int corner1Y = corner1.pos().getY();
 		
-		boolean isHorizontal = (corner1Y == corner2.getPos().getY()
-			&& corner1Y == corner3.getPos().getY()
-			&& corner1Y == corner4.getPos().getY());
+		boolean isHorizontal = (corner1Y == corner2.pos().getY()
+			&& corner1Y == corner3.pos().getY()
+			&& corner1Y == corner4.pos().getY());
 		
 		// Only relevant for vertical portals.
-		Axis horizontalCornerFacing = (corner1.getFacingA().getAxis() != Axis.Y)
-			? corner1.getFacingA().getAxis()
-			: corner1.getFacingB().getAxis();
+		Axis horizontalCornerFacing = (corner1.facingA().getAxis() != Axis.Y)
+			? corner1.facingA().getAxis()
+			: corner1.facingB().getAxis();
 		
 		Axis portalAxis = isHorizontal
 			? Axis.Y
@@ -206,7 +314,7 @@ public final class PortalRegistry
 	 * @param pos
 	 * The {@link BlockPos} of one of the portals blocks (portal or frame).
 	 */
-	public static void deactivatePortal(ServerLevel world, BlockPos pos)
+	public void deactivatePortal(ServerLevel world, BlockPos pos)
 	{
 		if (world == null || pos == null) return;
 		
@@ -231,11 +339,11 @@ public final class PortalRegistry
 	 * <code>true</code> if the block at the specified position is part of 
 	 * a registered portal, otherwise <code>false</code>.
 	 */
-	public static boolean isPortalAt(BlockPos pos, ResourceKey<Level> dimension)
+	public boolean isPortalAt(BlockPos pos, ResourceKey<Level> dimension)
 	{
 		List<Portal> portals = getPortalsAt(pos, dimension);
 		
-		return (portals != null) && (portals.size() > 0);
+		return (portals != null) && (!portals.isEmpty());
 	}
 
 	/**
@@ -244,10 +352,10 @@ public final class PortalRegistry
  	 * @return
 	 * An immutable map containing all portals and their positions.
 	 */
-	public static ImmutableListMultimap<BlockPos, Portal> getPortals()
-	{
-		return ImmutableListMultimap.copyOf(portals);
-	}
+//	public ImmutableListMultimap<BlockPos, Portal> getPortals()
+//	{
+//		return ImmutableListMultimap.copyOf(portals);
+//	}
 
 	/**
 	 * Gets all registered portals and their addresses.
@@ -255,10 +363,20 @@ public final class PortalRegistry
 	 * @return
 	 * An immutable map containing all portals and their addresses.
 	 */
-	public static ImmutableListMultimap<Address, Portal> getAddresses()
-	{
-		return ImmutableListMultimap.copyOf(addresses);
-	}
+//	public ImmutableListMultimap<Address, Portal> getAddresses()
+//	{
+//		return ImmutableListMultimap.copyOf(addresses);
+//	}
+//
+//	public ImmutableListMultimap<Portal, BlockPos> getGauges()
+//	{
+//		return ImmutableListMultimap.copyOf(gauges);
+//	}
+//
+//	public HashMap<Portal, Integer> getPower()
+//	{
+//		return power;
+//	}
 
 	/**
 	 * Gets the portals registered at the specified position in the
@@ -272,13 +390,11 @@ public final class PortalRegistry
 	 * A read-only list of found portals (may be empty) or <code>null</code> if
 	 * <code>pos</code> was <code>null</code>.
 	 */
-	public static List<Portal> getPortalsAt(BlockPos pos, ResourceKey<Level> dimension)
+	public List<Portal> getPortalsAt(BlockPos pos, ResourceKey<Level> dimension)
 	{
 		if (pos == null) return null;
-		
-		List<Portal> foundPortals = portals.get(pos).stream().filter(portal -> portal.getDimension() == dimension).collect(Collectors.toList());
-		
-		return Collections.unmodifiableList(foundPortals);
+
+		return portals.get(pos).stream().filter(portal -> portal.dimension() == dimension).toList();
 	}
 
 	/**
@@ -289,11 +405,11 @@ public final class PortalRegistry
 	 * @return
 	 * A read-only list of found portals (may be empty).
 	 */
-	public static List<Portal> getPortalsInDimension(ResourceKey<Level> dimension)
+	public List<Portal> getPortalsInDimension(ResourceKey<Level> dimension)
 	{
 		Set<Portal> uniquePortals = new HashSet<>(portals.values());
 
-		return uniquePortals.stream().filter(portal -> portal.getDimension() == dimension).toList();
+		return uniquePortals.stream().filter(portal -> portal.dimension() == dimension).toList();
 	}
 
 	/**
@@ -305,7 +421,7 @@ public final class PortalRegistry
 	 * A read-only list of found portals (may be empty) or <code>null</code> if
 	 * <code>address</code> was <code>null</code>.
 	 */
-	public static List<Portal> getPortalsWithAddress(Address address)
+	public List<Portal> getPortalsWithAddress(Address address)
 	{
 		if (address == null) return null;
 		
@@ -320,7 +436,7 @@ public final class PortalRegistry
 	 * @return
 	 * A read-only list of all portals (may be empty).
 	 */
-	public static List<Portal> getAllPortals()
+	public List<Portal> getAllPortals()
 	{
 		Set<Portal> uniquePortals = new HashSet<>(portals.values());
 
@@ -336,7 +452,7 @@ public final class PortalRegistry
 	 * A read-only list of {@link BlockPos} (may be empty) or <code>null</code> if
 	 * <code>portal</code> was <code>null</code>.
 	 */
-	public static List<BlockPos> getPowerGauges(Portal portal)
+	public List<BlockPos> getPowerGauges(Portal portal)
 	{
 		if (portal == null) return null;
 		
@@ -355,11 +471,11 @@ public final class PortalRegistry
 	 * @return
 	 * The surplus power that could not be added to the portal.
 	 */
-	public static int addPower(Portal portal, int amount)
+	public int addPower(Portal portal, int amount)
 	{
 		if (portal == null || amount < 1) return amount;
 		
-		int oldAmount = getPower(portal);
+		int oldAmount = getPortalPower(portal);
 		int freeCapacity = Math.max(Settings.powerCapacity - oldAmount, 0);
 		int amountToAdd = Math.min(freeCapacity, amount);
 		int surplus = amount - amountToAdd;
@@ -368,7 +484,7 @@ public final class PortalRegistry
 		
 		// Trigger save of portal data
 		
-		SimplePortals.portalSaveData.setDirty();
+		setDirty();
 		
 		return surplus;
 	}
@@ -384,11 +500,11 @@ public final class PortalRegistry
 	 * @return
 	 * <code>true</code> if the amount could be removed, otherwise <code>false</code>.
 	 */
-	public static boolean removePower(Portal portal, int amount)
+	public boolean removePower(Portal portal, int amount)
 	{
 		if (portal == null || amount < 1) return false;
 		
-		int oldAmount = getPower(portal);
+		int oldAmount = getPortalPower(portal);
 		
 		if (oldAmount < amount) return false;
 		
@@ -396,7 +512,7 @@ public final class PortalRegistry
 		
 		// Trigger save of portal data
 		
-		SimplePortals.portalSaveData.setDirty();
+		setDirty();
 		
 		return true;
 	}
@@ -409,7 +525,7 @@ public final class PortalRegistry
 	 * @return
 	 * The portals power or <code>0</code>.
 	 */
-	public static int getPower(Portal portal)
+	public int getPortalPower(Portal portal)
 	{
 		return (portal != null) ? power.get(portal) : 0;
 	}
@@ -422,7 +538,7 @@ public final class PortalRegistry
 	 * @param portal
 	 * The {@link Portal}.
 	 */
-	public static void updatePowerGauges(ServerLevel world, Portal portal)
+	public void updatePowerGauges(ServerLevel world, Portal portal)
 	{
 		if (world == null | portal == null) return;
 		
@@ -447,7 +563,7 @@ public final class PortalRegistry
 	{
 		if (block == null) return null;
 
-		return Registry.BLOCK.getKey(block).toString();
+		return BuiltInRegistries.BLOCK.getKey(block).toString();
 	}
 	
 	/**
@@ -503,7 +619,7 @@ public final class PortalRegistry
 		if (startPos == null || searchDir == null || cornerFacing == null) return null;
 		
 		BlockPos currentPos = startPos;
-		int size = 0;
+		int size = 1;
 		
 		do
 		{
@@ -520,7 +636,7 @@ public final class PortalRegistry
 			currentPos = currentPos.relative(searchDir);
 			size++;
 		}
-		while (size <= Settings.maxSize - 1);
+		while (size <= Settings.maxSize);
 		
 		return null;
 	}
@@ -535,7 +651,7 @@ public final class PortalRegistry
 	 * @param powerGauges
 	 * The power gauges that are part or the portal.
 	 */
-	private static void register(ServerLevel world, Portal portal, List<BlockPos> powerGauges)
+	private void register(ServerLevel world, Portal portal, List<BlockPos> powerGauges)
 	{
 		if (world == null || portal == null) return;
 		
@@ -544,7 +660,7 @@ public final class PortalRegistry
 			portals.put(portalPos.immutable(), portal);
 		}
 		
-		addresses.put(portal.getAddress(), portal);
+		addresses.put(portal.address(), portal);
 		power.put(portal, 0);
 		powerGauges.forEach(pos -> gauges.put(portal, pos));
 		
@@ -552,7 +668,7 @@ public final class PortalRegistry
 		
 		// Trigger save of portal data
 		
-		SimplePortals.portalSaveData.setDirty();
+		setDirty();
 	}
 	
 	/**
@@ -563,7 +679,7 @@ public final class PortalRegistry
 	 * @param portal
 	 * The {@link Portal} to unregister.
 	 */
-	private static void unregister(ServerLevel world, Portal portal)
+	private void unregister(ServerLevel world, Portal portal)
 	{
 		if (world == null || portal == null) return;
 		
@@ -572,7 +688,7 @@ public final class PortalRegistry
 			portals.remove(portalPos, portal);
 		}
 		
-		addresses.remove(portal.getAddress(), portal);
+		addresses.remove(portal.address(), portal);
 		power.remove(portal);
 		
 		updatePowerGauges(world, portal);
@@ -582,7 +698,7 @@ public final class PortalRegistry
 		
 		// Trigger save of portal data
 		
-		SimplePortals.portalSaveData.setDirty();
+		setDirty();
 	}
 	
 	/**
@@ -625,130 +741,130 @@ public final class PortalRegistry
 	 * @param nbt
 	 * The {@link CompoundTag} to save the registry data in.
 	 */
-	public static void writeToNBT(CompoundTag nbt)
-	{
-		if (nbt == null) return;
-		
-		CompoundTag portalsTag = new CompoundTag();
-		CompoundTag portalBlocksTag = new CompoundTag();
-		CompoundTag powerTag = new CompoundTag();
-		CompoundTag subTag;
-		
-		// Serialization of all Portals into a list.
-		
-		int i = 0;
-		HashMap<Portal, Integer> portalIDs = Maps.newHashMap();
-		Set<Portal> uniquePortals = new HashSet<>(portals.values());
-		
-		for (Portal portal : uniquePortals)
-		{
-			portalIDs.put(portal, i);
-			powerTag.putInt(String.valueOf(i), power.get(portal));
-			portalsTag.put(String.valueOf(i++), portal.serializeNBT());
-		}
-		
-		i = 0;
-		int x = 0;
-		
-		// Serialization of BlockPos to Portal map.
-		
-		for (BlockPos pos : portals.keySet())
-		{
-			subTag = new CompoundTag();
-			subTag.putLong("pos", pos.asLong());
-			subTag.putBoolean("isGauge", gauges.containsValue(pos));
-			
-			for (Portal portal : portals.get(pos))
-			{
-				subTag.putInt("portal" + x++, portalIDs.get(portal));
-			}
-			
-			x = 0;
-			
-			portalBlocksTag.put(String.valueOf(i++), subTag);
-		}
-		
-		nbt.put("portals", portalsTag);
-		nbt.put("portalBlocks", portalBlocksTag);
-		nbt.put("power", powerTag);
-	}
-	
-	/**
-	 * Reads the registry data from a NBT compound tag.
-	 * 
-	 * @param nbt
-	 * The {@link CompoundTag} to read the registry data from.
-	 */
-	public static void readFromNBT(CompoundTag nbt)
-	{
-		if (nbt == null) return;
-		
-		portals.clear();
-		addresses.clear();
-		
-		CompoundTag portalsTag = nbt.getCompound("portals");
-		CompoundTag portalBlocksTag = nbt.getCompound("portalBlocks");
-		CompoundTag powerTag = nbt.getCompound("power");
-		
-		int i = 0;
-		String key;
-		CompoundTag tag;
-		Portal portal;
-		
-		// Get the portals and their IDs.
-		
-		HashMap<Integer, Portal> portalIDs = Maps.newHashMap();
-		
-		while(portalsTag.contains(key = String.valueOf(i)))
-		{
-			tag = portalsTag.getCompound(key);
-			
-			portal = new Portal();
-			portal.deserializeNBT(tag);
-
-			portalIDs.put(i++, portal);
-		}
-		
-		// Deserialization of BlockPos to Portal map.
-		
-		i = 0;
-		int x = 0;
-		String subKey;
-		BlockPos portalPos;
-		boolean isGauge;
-		
-		while (portalBlocksTag.contains(key = String.valueOf(i++)))
-		{
-			tag = portalBlocksTag.getCompound(key);
-			
-			portalPos = BlockPos.of(tag.getLong("pos"));
-			isGauge = tag.getBoolean("isGauge");
-			
-			while (tag.contains(subKey = "portal" + x++))
-			{
-				portal = portalIDs.get(tag.getInt(subKey));
-				portals.put(portalPos, portal);
-				
-				if (isGauge) gauges.put(portal, portalPos);
-			}
-			
-			x = 0;
-		}
-		
-		// Regeneration of Address to Portal map.
-		
-		for (Portal p : portalIDs.values())
-		{
-			addresses.put(p.getAddress(), p);
-		}
-		
-		// Generate power map.
-		
-		i = 0;
-		
-		while (powerTag.contains(key = String.valueOf(i)))
-		{
-			power.put(portalIDs.get(i++), powerTag.getInt(key));
-		}
-	}
+//	public void writeToNBT(CompoundTag nbt)
+//	{
+//		if (nbt == null) return;
+//
+//		CompoundTag portalsTag = new CompoundTag();
+//		CompoundTag portalBlocksTag = new CompoundTag();
+//		CompoundTag powerTag = new CompoundTag();
+//		CompoundTag subTag;
+//
+//		// Serialization of all Portals into a list.
+//
+//		int i = 0;
+//		HashMap<Portal, Integer> portalIDs = Maps.newHashMap();
+//		Set<Portal> uniquePortals = new HashSet<>(portals.values());
+//
+//		for (Portal portal : uniquePortals)
+//		{
+//			portalIDs.put(portal, i);
+//			powerTag.putInt(String.valueOf(i), power.get(portal));
+//			portalsTag.put(String.valueOf(i++), portal.serializeNBT());
+//		}
+//
+//		i = 0;
+//		int x = 0;
+//
+//		// Serialization of BlockPos to Portal map.
+//
+//		for (BlockPos pos : portals.keySet())
+//		{
+//			subTag = new CompoundTag();
+//			subTag.putLong("pos", pos.asLong());
+//			subTag.putBoolean("isGauge", gauges.containsValue(pos));
+//
+//			for (Portal portal : portals.get(pos))
+//			{
+//				subTag.putInt("portal" + x++, portalIDs.get(portal));
+//			}
+//
+//			x = 0;
+//
+//			portalBlocksTag.put(String.valueOf(i++), subTag);
+//		}
+//
+//		nbt.put("portals", portalsTag);
+//		nbt.put("portalBlocks", portalBlocksTag);
+//		nbt.put("power", powerTag);
+//	}
+//
+//	/**
+//	 * Reads the registry data from a NBT compound tag.
+//	 *
+//	 * @param nbt
+//	 * The {@link CompoundTag} to read the registry data from.
+//	 */
+//	public void readFromNBT(CompoundTag nbt)
+//	{
+//		if (nbt == null) return;
+//
+//		portals.clear();
+//		addresses.clear();
+//
+//		CompoundTag portalsTag = nbt.getCompound("portals").get();
+//		CompoundTag portalBlocksTag = nbt.getCompound("portalBlocks").get();
+//		CompoundTag powerTag = nbt.getCompound("power").get();
+//
+//		int i = 0;
+//		String key;
+//		CompoundTag tag;
+//		Portal portal;
+//
+//		// Get the portals and their IDs.
+//
+//		HashMap<Integer, Portal> portalIDs = Maps.newHashMap();
+//
+//		while(portalsTag.contains(key = String.valueOf(i)))
+//		{
+//			tag = portalsTag.getCompound(key).get();
+//
+//			portal = new Portal();
+//			portal.deserializeNBT(tag);
+//
+//			portalIDs.put(i++, portal);
+//		}
+//
+//		// Deserialization of BlockPos to Portal map.
+//
+//		i = 0;
+//		int x = 0;
+//		String subKey;
+//		BlockPos portalPos;
+//		boolean isGauge;
+//
+//		while (portalBlocksTag.contains(key = String.valueOf(i++)))
+//		{
+//			tag = portalBlocksTag.getCompound(key).get();
+//
+//			portalPos = BlockPos.of(tag.getLong("pos").get());
+//			isGauge = tag.getBoolean("isGauge").get();
+//
+//			while (tag.contains(subKey = "portal" + x++))
+//			{
+//				portal = portalIDs.get(tag.getInt(subKey));
+//				portals.put(portalPos, portal);
+//
+//				if (isGauge) gauges.put(portal, portalPos);
+//			}
+//
+//			x = 0;
+//		}
+//
+//		// Regeneration of Address to Portal map.
+//
+//		for (Portal p : portalIDs.values())
+//		{
+//			addresses.put(p.getAddress(), p);
+//		}
+//
+//		// Generate power map.
+//
+//		i = 0;
+//
+//		while (powerTag.contains(key = String.valueOf(i)))
+//		{
+//			power.put(portalIDs.get(i++), powerTag.getInt(key).get());
+//		}
+//	}
 }

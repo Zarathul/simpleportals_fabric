@@ -1,10 +1,14 @@
 package net.zarathul.simpleportals.blocks;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.zarathul.simpleportals.Settings;
+import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.registration.Portal;
 import net.zarathul.simpleportals.registration.PortalRegistry;
 
@@ -16,7 +20,7 @@ import java.util.List;
  */
 public class BlockPowerGauge extends BlockPortalFrame
 {
-	public BlockPowerGauge() { super();	}
+	public BlockPowerGauge(ResourceKey<Block> id) { super(id); }
 
 	@Override
 	public boolean hasAnalogOutputSignal(BlockState blockState)
@@ -25,11 +29,11 @@ public class BlockPowerGauge extends BlockPortalFrame
 	}
 
 	@Override
-	public int getAnalogOutputSignal(BlockState state, Level world, BlockPos pos)
+	protected int getAnalogOutputSignal(BlockState state, Level world, BlockPos pos, Direction direction)
 	{
 		if (!world.isClientSide())
 		{
-			List<Portal> portals = PortalRegistry.getPortalsAt(pos, world.dimension());
+			List<Portal> portals = SimplePortals.portalRegistry.getPortalsAt(pos, world.dimension());
 
 			if (portals != null && portals.size() > 0)
 			{
@@ -64,7 +68,7 @@ public class BlockPowerGauge extends BlockPortalFrame
 			
 			if (maxUses > 0)
 			{
-				int power = PortalRegistry.getPower(portal);
+				int power = SimplePortals.portalRegistry.getPortalPower(portal);
 				int uses = Mth.floor(power / (float)Settings.powerCost);
 				
 				int signalStrength = Mth.floor((uses / (float)maxUses) * 14.0f) + ((uses > 0) ? 1 : 0);

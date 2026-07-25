@@ -2,7 +2,7 @@ package net.zarathul.simpleportals.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import net.minecraft.commands.CommandRuntimeException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.DimensionArgument;
@@ -13,7 +13,10 @@ import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.Permissions;
 import net.zarathul.simpleportals.common.Utils;
+
+import java.util.Set;
 
 public class CommandTeleport
 {
@@ -26,7 +29,7 @@ public class CommandTeleport
 	public static void register(CommandDispatcher<CommandSourceStack> dispatcher)
 	{
 		dispatcher.register(
-			Commands.literal("tpd").requires((commandSource) -> commandSource.hasPermission(2))
+			Commands.literal("tpd").requires((commandSource) -> commandSource.permissions().hasPermission(Permissions.COMMANDS_OWNER))
 			.executes(context -> {
 				SendTranslatedMessage(context.getSource(), "commands.tpd.info");
 				return 1;
@@ -54,7 +57,7 @@ public class CommandTeleport
 		);
 	}
 
-	private static int tp(CommandSourceStack source, TeleportMode mode, ServerLevel dimension, BlockPos destination, ServerPlayer targetPlayer, ServerPlayer player)
+	private static int tp(CommandSourceStack source, TeleportMode mode, ServerLevel dimension, BlockPos destination, ServerPlayer targetPlayer, ServerPlayer player) throws CommandSyntaxException
 	{
 		if (player == null)
 		{
@@ -64,7 +67,7 @@ public class CommandTeleport
 			}
 			catch (CommandSyntaxException ex)
 			{
-				throw new CommandRuntimeException(Component.translatable("commands.errors.unknown_sender"));
+				throw new SimpleCommandExceptionType(Component.translatable("commands.errors.unknown_sender")).create();
 			}
 		}
 
@@ -76,19 +79,29 @@ public class CommandTeleport
 
 			case ToPlayer:
 				destination = targetPlayer.blockPosition();
-				dimension = targetPlayer.getLevel();
+				dimension = targetPlayer.level();
 
 				break;
 		}
 
-		Utils.teleportTo(player, dimension.dimension(), destination, Direction.NORTH);
-		SendTranslatedMessage(source, "commands.tpd.success", player.getName(), destination.getX(), destination.getY(), destination.getZ(), dimension.dimension().location());
+//		Utils.teleportTo(player, dimension.dimension(), destination, Direction.NORTH);
+		player.teleportTo(
+			source.getServer().getLevel(dimension.dimension()),
+			destination.getX(),
+			destination.getY(),
+			destination.getZ(),
+			Set.of(),
+			player.getXRot(),
+			player.getYRot(),
+			false
+		);
+		SendTranslatedMessage(source, "commands.tpd.success", player.getName(), destination.getX(), destination.getY(), destination.getZ(), dimension.dimension().identifier());
 
 		return 1;
 	}
 
 	private static void SendTranslatedMessage(CommandSourceStack source, String message, Object... args)
 	{
-		source.sendSuccess(Component.translatable(message, args), false);
+		source.sendSuccess(() -> Component.translatable(message, args), false);
 	}
 }

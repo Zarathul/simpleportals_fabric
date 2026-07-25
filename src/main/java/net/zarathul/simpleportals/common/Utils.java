@@ -1,16 +1,22 @@
 package net.zarathul.simpleportals.common;
 
+import com.google.common.primitives.Ints;
+import com.mojang.authlib.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.protocol.game.*;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.TicketType;
+import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.players.PlayerList;
 import net.minecraft.util.Mth;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -22,18 +28,18 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.LevelData;
 import net.minecraft.world.phys.Vec3;
 import net.zarathul.simpleportals.Settings;
+import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.mixin.EntityAccessor;
 import net.zarathul.simpleportals.mixin.ServerPlayerAccessor;
 
 import java.util.ArrayList;
+import java.util.Optional;
 
 /**
  * General utility class.
  */
 public final class Utils
 {
-	private static final Language I18N = Language.getInstance();
-
 	/**
 	 * Gets the localized formatted string for the specified key.
 	 *
@@ -46,31 +52,33 @@ public final class Utils
 	 */
 	public static String translate(String key, Object... parameters)
 	{
+		Language I18N = Language.getInstance();
 		return String.format(I18N.getOrDefault(key), parameters);
 	}
 
 	/**
-	 * Gets the localized formatted strings for the specified key and formatting arguments.
+	 * Gets translatable, formatted components for the specified key and formatting arguments.
 	 *
 	 * @param key
 	 * The base key without an index (e.g. "myKey" gets "myKey0", "myKey1" ... etc.).
 	 * @param args
 	 * Formatting arguments.
 	 * @return
-	 * A list of localized strings for the specified key, or an empty list if the key was not found.
+	 * A list translatable components for the specified key, or an empty list if the key was not found.
 	 */
-	public static ArrayList<Component> multiLineTranslate(String key, Object... args)
+	public static ArrayList<MutableComponent> multiLineTranslatable(String key, Object... args)
 	{
-		ArrayList<Component> lines = new ArrayList<>();
+		Language I18N = Language.getInstance();
+		ArrayList<MutableComponent> lines = new ArrayList<>();
 
-		if (key != null)
+		if (key != null && !key.isEmpty())
 		{
 			int x = 0;
 			String currentKey = key + x;
 
 			while (I18N.has(currentKey))
 			{
-				lines.add(Component.literal(String.format(I18N.getOrDefault(currentKey), args)));
+				lines.add(Component.translatable(currentKey, args));
 				currentKey = key + ++x;
 			}
 		}
@@ -120,7 +128,7 @@ public final class Utils
 				(directionVec.getY() == 0) ? 0 : directionVec.getY() / Mth.abs(directionVec.getY()),
 				(directionVec.getZ() == 0) ? 0 : directionVec.getZ() / Mth.abs(directionVec.getZ()));
 
-		return Direction.fromNormal(directionVec.getX(), directionVec.getY(), directionVec.getZ());
+		return Direction.getNearest(directionVec.getX(), directionVec.getY(), directionVec.getZ(), Direction.DOWN);
 	}
 
 	/**
@@ -156,97 +164,97 @@ public final class Utils
 	 * this will be a different entity than the one passed in. This is the case, because the entity needs to be
 	 * recreated in the destination dimension.
 	 */
-	public static Entity teleportTo(Entity entity, ResourceKey<Level> dimension, BlockPos destination, Direction facing)
-	{
-		if (entity == null || dimension == null || destination == null || !entity.canChangeDimensions() || entity.isVehicle() || entity.isPassenger()) return entity;
-
-		ServerPlayer player = (entity instanceof ServerPlayer) ? (ServerPlayer) entity : null;
-		boolean interdimensional = (entity.getCommandSenderWorld().dimension() != dimension);
-		entity.setDeltaMovement(Vec3.ZERO);
-
-		if (player != null)
-		{
-			if (interdimensional)
-			{
-				teleportPlayerToDimension(player, dimension, destination, getYaw(facing), 0.0f);
-			}
-			else
-			{
-				ChunkPos chunkPos = new ChunkPos(destination);
-				((ServerLevel)entity.level).getChunkSource().addRegionTicket(TicketType.POST_TELEPORT, chunkPos, 1, entity.getId());
-				((ServerPlayer)entity).connection.teleport(destination.getX() + 0.5d, destination.getY(), destination.getZ() + 0.5d, getYaw(facing), 0.0f);
-			}
-
-			// Play teleportation sound.
-			if (Settings.teleportationSoundEnabled) player.connection.send(new ClientboundLevelEventPacket(1032, BlockPos.ZERO, 0, false));
-		}
-		else
-		{
-			if (interdimensional)
-			{
-				return teleportNonPlayerEntityToDimension(entity, dimension, destination, getYaw(facing));
-			}
-			else
-			{
-				entity.moveTo(destination.getX() + 0.5d,
-							  destination.getY(),
-							  destination.getZ() + 0.5d,
-							  getYaw(facing),
-							  0.0f);
-			}
-		}
-
-		return entity;
-	}
+//	public static Entity teleportTo(Entity entity, ResourceKey<Level> dimension, BlockPos destination, Direction facing)
+//	{
+//		if (entity == null || dimension == null || destination == null || !entity.canChangeDimensions() || entity.isVehicle() || entity.isPassenger()) return entity;
+//
+//		ServerPlayer player = (entity instanceof ServerPlayer) ? (ServerPlayer) entity : null;
+//		boolean interdimensional = (entity.getCommandSenderWorld().dimension() != dimension);
+//		entity.setDeltaMovement(Vec3.ZERO);
+//
+//		if (player != null)
+//		{
+//			if (interdimensional)
+//			{
+//				teleportPlayerToDimension(player, dimension, destination, getYaw(facing), 0.0f);
+//			}
+//			else
+//			{
+//				ChunkPos chunkPos = new ChunkPos(destination);
+//				((ServerLevel)entity.level).getChunkSource().addRegionTicket(TicketType.POST_TELEPORT, chunkPos, 1, entity.getId());
+//				((ServerPlayer)entity).connection.teleport(destination.getX() + 0.5d, destination.getY(), destination.getZ() + 0.5d, getYaw(facing), 0.0f);
+//			}
+//
+//			// Play teleportation sound.
+//			if (Settings.teleportationSoundEnabled) player.connection.send(new ClientboundLevelEventPacket(1032, BlockPos.ZERO, 0, false));
+//		}
+//		else
+//		{
+//			if (interdimensional)
+//			{
+//				return teleportNonPlayerEntityToDimension(entity, dimension, destination, getYaw(facing));
+//			}
+//			else
+//			{
+//				entity.moveTo(destination.getX() + 0.5d,
+//							  destination.getY(),
+//							  destination.getZ() + 0.5d,
+//							  getYaw(facing),
+//							  0.0f);
+//			}
+//		}
+//
+//		return entity;
+//	}
 
 	/**
 	 * Generic version of {@link ServerPlayer#changeDimension(ServerLevel)} without the hardcoded stuff.
 	 */
-	private static void teleportPlayerToDimension(ServerPlayer player, ResourceKey<Level> dimensionKey, BlockPos destination, float yaw, float pitch)
-	{
-		// Setting this flag circumvents at least a part of the shitty speed hack checks in
-		// 'ServerGamePacketListenerImpl.handleMovePlayer()' that cause nothing but trouble.
-		((ServerPlayerAccessor)player).setIsChangingDimension(true);
-
-		MinecraftServer server = player.getServer();
-		if (server == null) return;
-
-		ServerLevel destinationDimension = server.getLevel(dimensionKey);
-		if (destinationDimension == null) return;
-
-		ServerLevel originDimension = player.getLevel();
-		LevelData levelData = destinationDimension.getLevelData();
-
-		player.connection.send(new ClientboundRespawnPacket(destinationDimension.dimensionTypeId(), destinationDimension.dimension(), BiomeManager.obfuscateSeed(destinationDimension.getSeed()), player.gameMode.getGameModeForPlayer(), player.gameMode.getPreviousGameModeForPlayer(), destinationDimension.isDebug(), destinationDimension.isFlat(), true, player.getLastDeathLocation()));
-		player.connection.send(new ClientboundChangeDifficultyPacket(levelData.getDifficulty(), levelData.isDifficultyLocked()));
-
-		PlayerList playerList = player.server.getPlayerList();
-		playerList.sendPlayerPermissionLevel(player);
-		originDimension.removePlayerImmediately(player, Entity.RemovalReason.CHANGED_DIMENSION);
-		((EntityAccessor)player).invokeUnsetRemoved();
-
-		player.setLevel(destinationDimension);
-		destinationDimension.addDuringPortalTeleport(player);
-
-		player.setYRot(yaw);
-		player.setXRot(pitch);
-		player.moveTo(destination.getX() + 0.5d, destination.getY(), destination.getZ() + 0.5d);
-		player.setDeltaMovement(Vec3.ZERO);
-
-		player.connection.send(new ClientboundPlayerAbilitiesPacket(player.getAbilities()));
-		playerList.sendLevelInfo(player, destinationDimension);
-		playerList.sendAllPlayerInfo(player);
-
-		for (MobEffectInstance effect : player.getActiveEffects())
-		{
-			player.connection.send(new ClientboundUpdateMobEffectPacket(player.getId(), effect));
-		}
-
-		player.connection.send(new ClientboundLevelEventPacket(1032, BlockPos.ZERO, 0, false));
-		player.giveExperienceLevels(0);	// This is just to set lastSentExp to -1
-		player.resetSentInfo();	// Set lastSentHealth to -1.0F
-		((ServerPlayerAccessor)player).setLastSendFood(-1);
-	}
+//	private static void teleportPlayerToDimension(ServerPlayer player, ResourceKey<Level> dimensionKey, BlockPos destination, float yaw, float pitch)
+//	{
+//		// Setting this flag circumvents at least a part of the shitty speed hack checks in
+//		// 'ServerGamePacketListenerImpl.handleMovePlayer()' that cause nothing but trouble.
+//		((ServerPlayerAccessor)player).setIsChangingDimension(true);
+//
+//		MinecraftServer server = player.getServer();
+//		if (server == null) return;
+//
+//		ServerLevel destinationDimension = server.getLevel(dimensionKey);
+//		if (destinationDimension == null) return;
+//
+//		ServerLevel originDimension = player.getLevel();
+//		LevelData levelData = destinationDimension.getLevelData();
+//
+//		player.connection.send(new ClientboundRespawnPacket(destinationDimension.dimensionTypeId(), destinationDimension.dimension(), BiomeManager.obfuscateSeed(destinationDimension.getSeed()), player.gameMode.getGameModeForPlayer(), player.gameMode.getPreviousGameModeForPlayer(), destinationDimension.isDebug(), destinationDimension.isFlat(), true, player.getLastDeathLocation()));
+//		player.connection.send(new ClientboundChangeDifficultyPacket(levelData.getDifficulty(), levelData.isDifficultyLocked()));
+//
+//		PlayerList playerList = player.server.getPlayerList();
+//		playerList.sendPlayerPermissionLevel(player);
+//		originDimension.removePlayerImmediately(player, Entity.RemovalReason.CHANGED_DIMENSION);
+//		((EntityAccessor)player).invokeUnsetRemoved();
+//
+//		player.setLevel(destinationDimension);
+//		destinationDimension.addDuringPortalTeleport(player);
+//
+//		player.setYRot(yaw);
+//		player.setXRot(pitch);
+//		player.moveTo(destination.getX() + 0.5d, destination.getY(), destination.getZ() + 0.5d);
+//		player.setDeltaMovement(Vec3.ZERO);
+//
+//		player.connection.send(new ClientboundPlayerAbilitiesPacket(player.getAbilities()));
+//		playerList.sendLevelInfo(player, destinationDimension);
+//		playerList.sendAllPlayerInfo(player);
+//
+//		for (MobEffectInstance effect : player.getActiveEffects())
+//		{
+//			player.connection.send(new ClientboundUpdateMobEffectPacket(player.getId(), effect));
+//		}
+//
+//		player.connection.send(new ClientboundLevelEventPacket(1032, BlockPos.ZERO, 0, false));
+//		player.giveExperienceLevels(0);	// This is just to set lastSentExp to -1
+//		player.resetSentInfo();	// Set lastSentHealth to -1.0F
+//		((ServerPlayerAccessor)player).setLastSendFood(-1);
+//	}
 
 	/**
 	 * Teleport a non-player entity to the specified position in the specified dimension
@@ -265,34 +273,34 @@ public final class Utils
 	 * The entity after the teleportation process. If the teleportation was successful, this will be a different entity
 	 * than the one passed in. This is the case, because the entity needs to be recreated in the destination dimension.
 	 */
-	private static Entity teleportNonPlayerEntityToDimension(Entity entity, ResourceKey<Level> dimensionKey, BlockPos destination, float yaw)
-	{
-		if (!(entity.level instanceof ServerLevel) || entity.isRemoved()) return entity;
-
-		MinecraftServer server = entity.getServer();
-		if (server == null)	return entity;
-
-		ServerLevel destinationWorld = server.getLevel(dimensionKey);
-		if (destinationWorld == null) return entity;
-
-		entity.unRide();
-		Entity newEntity = entity.getType().create(destinationWorld);
-		if (newEntity == null) return entity;
-
-		newEntity.restoreFrom(entity);
-		newEntity.moveTo(destination.getX(), destination.getY(), destination.getZ(), yaw, newEntity.getXRot());
-		// This mixin might be overkill, since all this method does 99.9% of the time is setting Entity.removed
-		// to true, but who knows what other peoples mods do. Better safe than sorry I guess.
-		((EntityAccessor)entity).invokeRemoveAfterChangingDimensions();
-		destinationWorld.addDuringTeleport(newEntity);
-		newEntity.setDeltaMovement(Vec3.ZERO);
-		newEntity.setOnGround(true);
-
-		((ServerLevel)entity.level).resetEmptyTime();
-		destinationWorld.resetEmptyTime();
-
-		return newEntity;
-	}
+//	private static Entity teleportNonPlayerEntityToDimension(Entity entity, ResourceKey<Level> dimensionKey, BlockPos destination, float yaw)
+//	{
+//		if (!(entity.level instanceof ServerLevel) || entity.isRemoved()) return entity;
+//
+//		MinecraftServer server = entity.getServer();
+//		if (server == null)	return entity;
+//
+//		ServerLevel destinationWorld = server.getLevel(dimensionKey);
+//		if (destinationWorld == null) return entity;
+//
+//		entity.unRide();
+//		Entity newEntity = entity.getType().create(destinationWorld);
+//		if (newEntity == null) return entity;
+//
+//		newEntity.restoreFrom(entity);
+//		newEntity.moveTo(destination.getX(), destination.getY(), destination.getZ(), yaw, newEntity.getXRot());
+//		// This mixin might be overkill, since all this method does 99.9% of the time is setting Entity.removed
+//		// to true, but who knows what other peoples mods do. Better safe than sorry I guess.
+//		((EntityAccessor)entity).invokeRemoveAfterChangingDimensions();
+//		destinationWorld.addDuringTeleport(newEntity);
+//		newEntity.setDeltaMovement(Vec3.ZERO);
+//		newEntity.setOnGround(true);
+//
+//		((ServerLevel)entity.level).resetEmptyTime();
+//		destinationWorld.resetEmptyTime();
+//
+//		return newEntity;
+//	}
 
 	/**
 	 * Converts the specified facing to a degree value.
@@ -344,6 +352,35 @@ public final class Utils
 	}
 
 	/**
+	 * Creates an Identifier with the Mod-ID as the namespace.
+	 *
+	 * @param path
+	 * The path to create the Identifier for.
+	 * @return
+	 * An Identifier with <code>SimplePortals.MOD_ID</code> as the namespace, and <code>path</code> as the path.
+	 */
+	public static Identifier createModIdentifier(String path)
+	{
+		return Identifier.fromNamespaceAndPath(SimplePortals.MOD_ID, path);
+	}
+
+	/**
+	 * Centers an object of a given size in a container at a specified offset.
+	 *
+	 * @param offset
+	 * Offest at which the container resides.
+	 * @param containerSize
+	 * Size of the container.
+	 * @param objectSize
+	 * @return
+	 * May return a negative value, in case the object size is bigger than the container.
+	 */
+	public static int centerIn(int offset, int containerSize, int objectSize)
+	{
+		return offset + (containerSize - objectSize) / 2;
+	}
+
+	/**
 	 * Flags for {@link net.minecraft.world.level.Level#setBlock(BlockPos, BlockState, int)}.
 	 */
 	public static final class SetBlockFlags
@@ -355,7 +392,7 @@ public final class Utils
 		public static final int SKIP_NEIGHBOUR_SHAPE_UPDATE = 16;
 		/**
 		 * Unsure about that name (IS_MOVING). Forge called it that way.
-		 * Gets passed as true to {@link net.minecraft.world.level.block.Block#onRemove(BlockState, Level, BlockPos, BlockState, boolean)}
+		 * Gets passed as true to {@link net.minecraft.world.level.block.Block#onPlace(BlockState, Level, BlockPos, BlockState, boolean)}
 		 * when set.
 		* */
 		public static final int IS_MOVING = 64;
@@ -369,7 +406,7 @@ public final class Utils
 	 * @return
 	 * A string of the format "x=1234, z=1234, y=1234".
 	 */
-	public static String getReadablyBlockPos(BlockPos pos)
+	public static String getReadableBlockPos(BlockPos pos)
 	{
 		return String.format("x=%d, z=%d, y=%d", pos.getX(), pos.getZ(), pos.getY());
 	}

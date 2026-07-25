@@ -9,9 +9,9 @@ import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.SharedSuggestionProvider;
-import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.Block;
 
 import java.util.Arrays;
@@ -43,12 +43,12 @@ public class BlockArgument implements ArgumentType<Block>
 	@Override
 	public Block parse(StringReader reader) throws CommandSyntaxException
 	{
-		suggestionFuture = (builder) -> SharedSuggestionProvider.suggest(Registry.BLOCK.keySet().stream().map(ResourceLocation::toString).collect(Collectors.toList()), builder);
+		suggestionFuture = (builder) -> SharedSuggestionProvider.suggest(BuiltInRegistries.BLOCK.keySet().stream().map(Identifier::toString).collect(Collectors.toList()), builder);
 
 		int i = reader.getCursor();
-		ResourceLocation blockResourceLocation = ResourceLocation.read(reader);
+		Identifier blockResourceLocation = Identifier.read(reader);
 
-		if (Registry.BLOCK.getOptional(blockResourceLocation).isEmpty())
+		if (BuiltInRegistries.BLOCK.getOptional(blockResourceLocation).isEmpty())
 		{
 			reader.setCursor(i);
 			throw INVALID_ADDRESS.createWithContext(reader, blockResourceLocation);
@@ -56,7 +56,7 @@ public class BlockArgument implements ArgumentType<Block>
 
 		suggestionFuture = SuggestionsBuilder::buildFuture;
 
-		return Registry.BLOCK.get(blockResourceLocation);
+		return BuiltInRegistries.BLOCK.get(blockResourceLocation).get().value();
 	}
 
 	@Override

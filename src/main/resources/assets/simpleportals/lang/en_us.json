@@ -57,9 +57,6 @@
 	"commands.errors.multiple_portals_found_at_pos_in_dimension": "Multiple portals were found at 'x=%d, y=%d, z=%d' in dimension '%s'. Use the coordinates of a block that is only part of one portal.",
 	"commands.errors.no_power_items": "No valid items found for item tag '%s'. Check your config.",
 
-	"_comment": "Creative UI tab label",
-	"itemGroup.simpleportals.simplemods": "Simple Mods",
-
 	"_comment": "Config",
 	"config.common": "Common",
 	"config.client": "Client",

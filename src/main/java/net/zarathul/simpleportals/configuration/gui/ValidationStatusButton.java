@@ -1,21 +1,29 @@
 package net.zarathul.simpleportals.configuration.gui;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.gui.components.WidgetSprites;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.CommonComponents;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.ARGB;
 
 @Environment(EnvType.CLIENT)
 class ValidationStatusButton extends Button
 {
 	private boolean valid;
+	private WidgetSprites sprites = new WidgetSprites(
+			Identifier.withDefaultNamespace("dialog/warning_button"),
+			Identifier.withDefaultNamespace("dialog/warning_button_disabled"),
+			Identifier.withDefaultNamespace("dialog/warning_button_highlighted"),
+			Identifier.withDefaultNamespace("dialog/warning_button_disabled")
+	);
 
-	public ValidationStatusButton(int x, int y, Button.OnPress clickHandler)
+	public ValidationStatusButton(int x, int y, int width, int height, Button.OnPress clickHandler)
 	{
-		super(x, y, 15, 15, CommonComponents.EMPTY, clickHandler);
+		super(x, y, width, height, CommonComponents.EMPTY, clickHandler, DEFAULT_NARRATION);
 
 		this.valid = true;
 	}
@@ -41,44 +49,15 @@ class ValidationStatusButton extends Button
 	}
 
 	@Override
-	public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float partialTicks)
+	protected void extractContents(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a)
 	{
-		RenderSystem.setShader(GameRenderer::getPositionTexShader);
-		RenderSystem.setShaderTexture(0, Button.WIDGETS_LOCATION);
-		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-		Icon icon = (this.valid) ? Icon.VALID : Icon.INVALID;
-
-		this.blit(poseStack, this.x, this.y, icon.getX(), icon.getY(), this.width, this.height);
+		Identifier sprite = sprites.get(!valid, isHoveredOrFocused());
+		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, getX(), getY(), width, height, ARGB.white(alpha));
 	}
 
 	@Override
-	public boolean changeFocus(boolean forward)
+	public boolean shouldTakeFocusAfterInteraction()
 	{
 		return false;
-	}
-
-	enum Icon
-	{
-		VALID(208, 0),
-		INVALID(192, 0);
-
-		private final int x;
-		private final int y;
-
-		Icon(int x, int y)
-		{
-			this.x = x;
-			this.y = y;
-		}
-
-		public int getX()
-		{
-			return this.x;
-		}
-
-		public int getY()
-		{
-			return this.y;
-		}
 	}
 }

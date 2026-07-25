@@ -1,22 +1,23 @@
 package net.zarathul.simpleportals.configuration.gui;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.AbstractSelectionList;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.ImageButton;
-import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.*;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
+import net.minecraft.client.gui.layouts.LinearLayout;
+import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.client.resources.language.I18n;
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.permissions.Permission;
+import net.minecraft.server.permissions.PermissionLevel;
 import net.minecraft.world.entity.player.Player;
+import net.zarathul.simpleportals.common.Utils;
 import net.zarathul.simpleportals.configuration.Config;
 import net.zarathul.simpleportals.configuration.ConfigSetting;
 import net.zarathul.simpleportals.configuration.StorageMethods;
@@ -38,10 +39,12 @@ public class ConfigGui extends Screen
 	private final String configName;
 	private final Player player;
 	private final Consumer<Player> syncChanges;
+	private final HeaderAndFooterLayout layout;
 
 	private static final int PADDING = 5;
-	private static final int BUTTON_HEIGHT = 20;
+	private static final int BUTTON_HEIGHT = Button.DEFAULT_HEIGHT;
 	private static final int ENTRY_HEIGHT = 26;
+	private static final int FOOTER_HEIGHT = BUTTON_HEIGHT + 2 * PADDING;
 
 	public ConfigGui(Component title, Class<?> settingsType, String configName, Player player, Consumer<Player> syncChanges)
 	{
@@ -51,49 +54,69 @@ public class ConfigGui extends Screen
 		this.configName = configName;
 		this.player = player;
 		this.syncChanges = syncChanges;
+
+
+		int HEADER_HEIGHT = 2 * font.lineHeight + BUTTON_HEIGHT + 4 * PADDING;
+		layout = new HeaderAndFooterLayout(this, HEADER_HEIGHT, FOOTER_HEIGHT);
 	}
 
 	@Override
 	protected void init()
 	{
-		int titleHeight = Math.max(minecraft.font.wordWrapHeight(title.getString(), width - 2 * PADDING), BUTTON_HEIGHT);
-		int optionListHeaderHeight = titleHeight + 2 * PADDING;
-		this.optionList = new ModOptionList(this.settingsType, player, minecraft, width, height, optionListHeaderHeight, height, ENTRY_HEIGHT);
-		addRenderableWidget(optionList);
+		addHeader();
+		addFooter();
+		addContents();
 
-		addButton(width - 120 - 2 * PADDING, PADDING, 60, "config.back", button -> minecraft.setScreen(null));
-		addButton(width - 60 - PADDING, PADDING, 60, "config.save", button -> {
-			this.optionList.commitChanges();
-			Config.save(this.configName, this.settingsType);
-			minecraft.setScreen(null);
-			if (syncChanges != null) syncChanges.accept(player);
-		});
+		layout.visitWidgets(this::addRenderableWidget);
+
+		repositionElements();
 	}
 
-	private void addButton(int x, int y, int width, String i18nKey, Button.OnPress pressHandler)
+	private void addHeader()
 	{
-		Button button = new Button(x, y, width, BUTTON_HEIGHT, Component.translatable(i18nKey), pressHandler);
-		addRenderableWidget(button);
+		layout.addTitleHeader(title, font);
+	}
+
+	private void addContents()
+	{
+		optionList = new ModOptionList(settingsType, player, minecraft, width, 0, 0, ENTRY_HEIGHT);
+		layout.addToContents(optionList);
+	}
+
+	private void addFooter()
+	{
+		LinearLayout horizontalLayout = layout.addToFooter(LinearLayout.horizontal());
+		horizontalLayout.spacing(PADDING);
+
+		horizontalLayout.addChild(Button.builder(CommonComponents.GUI_CANCEL, button -> onClose()).width(200).build());	// Cancel button
+		horizontalLayout.addChild(Button.builder(Component.translatable("config.save"), button -> saveConfigAndCloseScreen()).width(200).build());	// Done button
+	}
+
+	private void saveConfigAndCloseScreen()
+	{
+		optionList.commitChanges();
+		Config.save(configName, settingsType);
+		minecraft.gui.setScreen(null);
+		if (syncChanges != null) syncChanges.accept(player);
 	}
 
 	@Override
-	public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTicks)
+	protected void repositionElements()
 	{
-		this.renderBackground(poseStack);
-		RenderSystem.setShader(GameRenderer::getPositionTexShader);
-		super.render(poseStack, mouseX, mouseY, partialTicks);
-		minecraft.font.draw(poseStack, title.getVisualOrderText(), PADDING, PADDING, ChatFormatting.WHITE.getColor());
+		layout.arrangeElements();
+		optionList.updateSize(width, layout);
+		layout.arrangeElements();
 	}
-
-	@Override
-	public void tick()
-	{
-		super.tick();
-		if (this.optionList != null) optionList.tick();
-	}
+//	@Override
+//	public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a)
+//	{
+//		super.extractRenderState(graphics, mouseX, mouseY, a);
+//
+//		graphics.text(minecraft.font, title.getVisualOrderText(), PADDING, PADDING, ARGB.white(1));
+//	}
 
 	@Environment(EnvType.CLIENT)
-	public class ModOptionList extends AbstractSelectionList<ModOptionList.Entry>
+	public class ModOptionList extends ContainerObjectSelectionList<ModOptionList.Entry>
 	{
 		private static final int LEFT_RIGHT_BORDER = 30;
 		private static final String I18N_PREFIX = "config.";
@@ -102,16 +125,16 @@ public class ConfigGui extends Screen
 		private static final String I18N_INVALID = "config.input_invalid";
 		private static final String I18N_NEEDS_WORLD_RESTART = "config.needs_world_restart";
 
-		public ModOptionList(Class<?> settingsType, Player player, Minecraft mc, int width, int height, int top, int bottom, int itemHeight)
+		public ModOptionList(Class<?> settingsType, Player player, Minecraft mc, int width, int height, int top, int itemHeight)
 		{
-			super(mc, width, height, top, bottom, itemHeight);
+			super(mc, width, height, top, itemHeight);
 			generateEntries(settingsType, player);
 		}
 
 		@Override
-		public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTicks)
+		protected void extractTooltipForNextRenderPass(GuiGraphicsExtractor graphics, int mouseX, int mouseY)
 		{
-			super.render(poseStack, mouseX, mouseY, partialTicks);
+			super.extractTooltipForNextRenderPass(graphics, mouseX, mouseY);
 
 			String tooltip;
 
@@ -122,20 +145,32 @@ public class ConfigGui extends Screen
 				if (tooltip != null && !tooltip.isEmpty())
 				{
 					List<Component> comment = Arrays.stream(tooltip.split("\n")).map(Component::translatable).collect(Collectors.toList());
-					renderComponentTooltip(poseStack, comment, mouseX, mouseY);
+					graphics.setComponentTooltipForNextFrame(minecraft.font, comment, mouseX, mouseY);
 
 					break;
 				}
 			}
 		}
-
-		public void tick()
-		{
-			for (Entry child : this.children())
-			{
-				child.tick();
-			}
-		}
+		//		@Override
+//		public void render(PoseStack poseStack, int mouseX, int mouseY, float partialTicks)
+//		{
+//			super.render(poseStack, mouseX, mouseY, partialTicks);
+//
+//			String tooltip;
+//
+//			for (Entry entry : this.children())
+//			{
+//				tooltip = entry.getTooltip();
+//
+//				if (tooltip != null && !tooltip.isEmpty())
+//				{
+//					List<Component> comment = Arrays.stream(tooltip.split("\n")).map(Component::translatable).collect(Collectors.toList());
+//					renderComponentTooltip(poseStack, comment, mouseX, mouseY);
+//
+//					break;
+//				}
+//			}
+//		}
 
 		@Override
 		public int getRowWidth()
@@ -144,7 +179,7 @@ public class ConfigGui extends Screen
 		}
 
 		@Override
-		protected int getScrollbarPosition()
+		protected int scrollBarX()
 		{
 			return width - LEFT_RIGHT_BORDER;
 		}
@@ -164,6 +199,7 @@ public class ConfigGui extends Screen
 			ConfigSetting annotation;
 			String category;
 			String lastCategory = null;
+			var I18N = Language.getInstance();
 
 			for (Field valueField : fields)
 			{
@@ -175,7 +211,9 @@ public class ConfigGui extends Screen
 				if (!category.equals(lastCategory))
 				{
 					String i18nKey = "config." + category;
-					String categoryLabel = (I18n.exists(i18nKey)) ? I18n.get(i18nKey) : category;
+					// If the key is not found, the key itself is returned instead of the translated text.
+					String i18nText = I18N.getOrDefault(i18nKey);
+					String categoryLabel = (!i18nText.equals(i18nKey)) ? i18nText : category;
 
 					addEntry(new CategoryEntry(categoryLabel));
 
@@ -186,39 +224,34 @@ public class ConfigGui extends Screen
 			}
 		}
 
-		@Override
-		public void updateNarration(NarrationElementOutput narrationElementOutput)
-		{
-		}
-
 		@Environment(EnvType.CLIENT)
-		public abstract class Entry extends AbstractSelectionList.Entry<ConfigGui.ModOptionList.Entry>
+		public abstract class Entry extends ContainerObjectSelectionList.Entry<ModOptionList.Entry>
 		{
 			public abstract void commitChanges();
-			public abstract void tick();
 			public abstract String getTooltip();
 		}
 
 		@Environment(EnvType.CLIENT)
 		public class CategoryEntry extends Entry
 		{
-			private final String text;
-			private final int width;
+			private final StringWidget categoryHeader;
 
 			public CategoryEntry(String text)
 			{
-				this.text = text;
-				this.width = minecraft.font.width(text);
+				categoryHeader = new StringWidget(Component.literal(text), font);
 			}
 
 			@Override
-			public void render(PoseStack poseStack, int index, int top, int left, int width, int height, int mouseX, int mouseY, boolean isHot, float partialTicks)
+			public void extractContent(GuiGraphicsExtractor graphics, int mouseX, int mouseY, boolean hovered, float a)
 			{
-				minecraft.font.drawShadow(poseStack, this.text, minecraft.screen.width / 2.0f - this.width / 2.0f, top + height - 9 - 1, ChatFormatting.WHITE.getColor());
+				int xPos = Utils.centerIn(0, width, categoryHeader.getWidth());
+				int yPos = Utils.centerIn(getContentY(), ENTRY_HEIGHT, categoryHeader.getHeight());
+				categoryHeader.setPosition(xPos, yPos);
+				categoryHeader.extractRenderState(graphics, mouseX, mouseY, a);
 			}
 
 			@Override
-			public boolean changeFocus(boolean forward)
+			public boolean shouldTakeFocusAfterInteraction()
 			{
 				return false;
 			}
@@ -229,20 +262,28 @@ public class ConfigGui extends Screen
 			}
 
 			@Override
-			public void tick()
-			{
-			}
-
-			@Override
 			public String getTooltip()
 			{
 				return null;
+			}
+
+			@Override
+			public List<? extends NarratableEntry> narratables()
+			{
+				return List.of();
+			}
+
+			@Override
+			public List<? extends GuiEventListener> children()
+			{
+				return List.of(categoryHeader);
 			}
 		}
 
 		@Environment(EnvType.CLIENT)
 		public class OptionEntry extends Entry
 		{
+			private StringWidget optionLabel;
 			private EditBox editBox;
 			private CheckboxButtonEx checkBox;
 			private EnumOptionButton enumButton;
@@ -253,6 +294,7 @@ public class ConfigGui extends Screen
 			private final Method validatorMethod;
 			private final Method loadMethod;
 			private final ConfigSetting annotation;
+			private Object value;
 
 			public OptionEntry(Field valueField, ConfigSetting annotation, Player player)
 			{
@@ -260,17 +302,23 @@ public class ConfigGui extends Screen
 				this.validatorMethod = Config.getValidator(valueField);
 				this.annotation = valueField.getAnnotation(ConfigSetting.class);
 				Optional<StorageMethods> loadSave = Config.getLoadSave(valueField);
-				this.loadMethod = (loadSave.isPresent()) ? loadSave.get().load : null;
+				loadMethod = (loadSave.isPresent()) ? loadSave.get().load : null;
 
 				Object defaultValue = Config.getDefaultValue(valueField);
 
-				boolean widgetIsActive = player.hasPermissions(annotation.permissionLvl());
+				var neededPermission = new Permission.HasCommandLevel(PermissionLevel.byId(annotation.permissionLvl()));
+				boolean widgetIsActive = player.permissions().hasPermission(neededPermission);
 
-				this.validatedButton = new ValidationStatusButton(0, 0, button -> {
+				Language I18N = Language.getInstance();
+				String label = I18N.getOrDefault(I18N_PREFIX + annotation.descriptionKey(), valueField.getName());
+				optionLabel = new StringWidget(Component.translatable(label), font);
+
+				// Has to be instantiated before the rest, because 'validateTextFieldInput()', which is called by 'editBox' on validation, sets 'validatedButton' state.
+				validatedButton = new ValidationStatusButton(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, button -> {
 					if (this.editBox != null)
 					{
 						this.editBox.setValue(defaultValue.toString());
-						this.editBox.setFocus(false);
+						this.editBox.setFocused(false);
 					}
 					else if (this.checkBox != null)
 					{
@@ -283,132 +331,115 @@ public class ConfigGui extends Screen
 				});
 				this.validatedButton.active = widgetIsActive;
 
-				this.needsWorldRestartButton = new ImageButton(0, 0, 15, 12, 182, 24, 0, Button.WIDGETS_LOCATION, 256, 256, (b) -> {});
-				this.needsWorldRestartButton.active = false;
-				this.needsWorldRestartButton.visible = annotation.needsWorldRestart();
-
-				Object value = null;
+//				Object value = null;
 
 				try
 				{
 					value = valueField.get(null);
 				}
-				catch (IllegalAccessException ignored) {}
+				catch (IllegalAccessException ignored)
+				{
+					value = null;
+				}
 
-				addRenderableWidget(this.validatedButton);
-				addRenderableWidget(this.needsWorldRestartButton);
+				checkBox = new CheckboxButtonEx(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, false);
+				enumButton = new EnumOptionButton(0, 0, 100, BUTTON_HEIGHT);
+				editBox = new EditBox(minecraft.font, 0, 0, 100, BUTTON_HEIGHT, CommonComponents.EMPTY);
+				editBox.setMaxLength(256);
+				editBox.moveCursorToStart(false);
+				editBox.setResponder(this::validateTextFieldInput);
 
 				if (value instanceof Boolean)
 				{
-					this.checkBox = new CheckboxButtonEx(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, CommonComponents.EMPTY, (boolean)value);
-					this.checkBox.active = widgetIsActive;
-
-					addRenderableWidget(this.checkBox);
+					checkBox.active = widgetIsActive;
+					checkBox.value = (boolean)value;
 				}
 				else if (value instanceof Enum)
 				{
-					this.enumButton = new EnumOptionButton(value.getClass(), value.toString(), 0, 0, 100, BUTTON_HEIGHT);
-					this.enumButton.active = widgetIsActive;
-
-					addRenderableWidget(this.enumButton);
+					enumButton.init(value.getClass(), value.toString());
+					enumButton.active = widgetIsActive;
 				}
 				else
 				{
-					this.editBox = new EditBox(minecraft.font, 0, 0, 100, BUTTON_HEIGHT, CommonComponents.EMPTY);
-					this.editBox.setTextColor(ChatFormatting.WHITE.getColor());
-					this.editBox.setMaxLength(256);
-					this.editBox.setCanLoseFocus(true);
-					if (value != null) this.editBox.setValue(value.toString());
-					this.editBox.setFilter(this::validateTextFieldInput);
-					this.editBox.active = widgetIsActive;
-					this.editBox.setEditable(widgetIsActive);
-
-					addRenderableWidget(this.editBox);
+					editBox.setEditable(widgetIsActive);
+					editBox.active = widgetIsActive;
+					editBox.setValue(value.toString());
 				}
+
+				this.needsWorldRestartButton = new ImageButton(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, new WidgetSprites(Identifier.withDefaultNamespace("icon/link")), (b) -> {});
+				this.needsWorldRestartButton.active = false;
+				this.needsWorldRestartButton.visible = annotation.needsWorldRestart();
 
 				this.tooltipText = null;
 			}
 
 			@Override
-			public void render(PoseStack poseStack, int index, int top, int left, int width, int height, int mouseX, int mouseY, boolean isHot, float partialTicks)
+			public void extractContent(GuiGraphicsExtractor graphics, int mouseX, int mouseY, boolean hovered, float a)
 			{
-				this.validatedButton.x = getScrollbarPosition() - this.validatedButton.getWidth() - this.needsWorldRestartButton.getWidth() - 2 * PADDING;
-				this.validatedButton.y = top + ((itemHeight - this.validatedButton.getHeight()) / 2) - 1;
-				this.validatedButton.render(poseStack, mouseX, mouseY, partialTicks);
+				int centerX = width / 2;
+				optionLabel.setPosition(centerX - optionLabel.getWidth() - PADDING, Utils.centerIn(getContentY(), ENTRY_HEIGHT, optionLabel.getHeight()));
+				optionLabel.extractRenderState(graphics, mouseX, mouseY, a);
 
-				// This needs to be here because the TextFieldWidget changes the GL state and never sets it back,
-				// nor does the ImageButton set the correct values to render properly. Without this call, the
-				// ImageButtons are just black after the first TextFieldWidget is rendered.
-				// Update: No longer needed because the ValidationStatusButton sets up the state correctly and is rendered
-				// BEFORE this ImageButton. DON'T delete this comment to avoid confusion in the future.
-				// RenderSystem.color4f(1.0F, 1.0F, 1.0F, 1.0f);
+				needsWorldRestartButton.setPosition(getContentRight() - needsWorldRestartButton.getWidth() - PADDING, Utils.centerIn(getContentY(), ENTRY_HEIGHT, needsWorldRestartButton.getHeight()));
+				needsWorldRestartButton.extractRenderState(graphics, mouseX, mouseY, a);
 
-				this.needsWorldRestartButton.x = getScrollbarPosition() - this.needsWorldRestartButton.getWidth() - PADDING;
-				this.needsWorldRestartButton.y = top + ((itemHeight - this.needsWorldRestartButton.getHeight()) / 2) - 1;
-				this.needsWorldRestartButton.render(poseStack, mouseX, mouseY, partialTicks);
+				validatedButton.setPosition(getContentRight() - validatedButton.getWidth() - needsWorldRestartButton.getWidth() - 2 * PADDING, Utils.centerIn(getContentY(), ENTRY_HEIGHT, needsWorldRestartButton.getHeight()));
+				validatedButton.extractRenderState(graphics, mouseX, mouseY, a);
 
-				if (this.editBox != null)
+				if (checkBox != null && (value instanceof Boolean))
 				{
-					this.editBox.x = left + (width / 2) + PADDING;
-					this.editBox.y = top;
-					this.editBox.setWidth((width / 2) - this.validatedButton.getWidth() - this.needsWorldRestartButton.getWidth() - 4 * PADDING - 6);
-					this.editBox.render(poseStack, mouseX, mouseY, partialTicks);
+					checkBox.setPosition(centerX + PADDING, Utils.centerIn(getContentY(), ENTRY_HEIGHT, checkBox.getHeight()));
+					checkBox.extractRenderState(graphics, mouseX, mouseY, a);
 				}
-				else if (this.checkBox != null)
+				else if (enumButton != null && (value instanceof Enum))
 				{
-					this.checkBox.x = left + (width / 2) + PADDING;
-					this.checkBox.y = top;
-					this.checkBox.render(poseStack, mouseX, mouseY, partialTicks);
+					enumButton.setPosition(centerX + PADDING, Utils.centerIn(getContentY(), ENTRY_HEIGHT, enumButton.getHeight()));
+					enumButton.setWidth(validatedButton.getX() - enumButton.getX() - PADDING);
+					enumButton.extractRenderState(graphics, mouseX, mouseY, a);
 				}
-				else if (this.enumButton != null)
+				else if (editBox != null)
 				{
-					this.enumButton.x = left + (width / 2) + PADDING;
-					this.enumButton.y = top;
-					this.enumButton.setWidth((width / 2) - this.validatedButton.getWidth() - this.needsWorldRestartButton.getWidth() - 4 * PADDING - 6);
-					this.enumButton.render(poseStack, mouseX, mouseY, partialTicks);
+					editBox.setPosition(centerX + PADDING, Utils.centerIn(getContentY(), ENTRY_HEIGHT, editBox.getHeight()));
+					editBox.setWidth(validatedButton.getX() - editBox.getX() - PADDING);
+					editBox.extractRenderState(graphics, mouseX, mouseY, a);
 				}
 
-				// Getting translations during rendering is not exactly a smart thing to do, but it's just the config UI so .. meh.
-				String description = I18n.get(I18N_PREFIX + this.annotation.descriptionKey());
-				int descriptionWidth = minecraft.font.width(description);
-				int descriptionLeft = left + (width / 2) - descriptionWidth - PADDING;
-				int descriptionTop = top + (itemHeight / 2) - PADDING - minecraft.font.lineHeight / 2 + 2;
-				minecraft.font.drawShadow(poseStack, description, descriptionLeft, descriptionTop, ChatFormatting.WHITE.getColor());
+				Language I18N = Language.getInstance();
 
 				// Set tooltip to be rendered by the ModOptionList. This could be moved to mouseMoved(), but either
 				// the tooltip for the description text would have to stay here or its bounds would have to be stored.
 				// To not complicate things, keep everything here for now.
-				if ((mouseX >= descriptionLeft) &&
-					(mouseX < (descriptionLeft + descriptionWidth)) &&
-					(mouseY >= descriptionTop) &&
-					(mouseY < (descriptionTop + minecraft.font.lineHeight)))
+				if ((mouseX >= optionLabel.getX()) &&
+					(mouseX < (optionLabel.getX() + optionLabel.getWidth())) &&
+					(mouseY >= optionLabel.getY()) &&
+					(mouseY < (optionLabel.getY() + optionLabel.getHeight())))
 				{
-					// Tooltip for the description
-					String i18nTooltipKey = I18N_PREFIX + this.annotation.descriptionKey() + I18N_TOOLTIP_SUFFIX;
-					this.tooltipText = (I18n.exists(i18nTooltipKey)) ?
-									   I18n.get(i18nTooltipKey) :
-									   this.annotation.description();
+					// Tooltip for the description.
+					// If the key is not found, the key itself is returned instead of the translated text.
+					String i18nTooltipKey = I18N_PREFIX + annotation.descriptionKey() + I18N_TOOLTIP_SUFFIX;
+					String i18nTooltipText = I18N.getOrDefault(i18nTooltipKey);
+					tooltipText = (!i18nTooltipText.equals(i18nTooltipKey)) ? i18nTooltipText : annotation.description();
 				}
-				else if ((mouseX >= this.validatedButton.x) &&
-						 (mouseX < (this.validatedButton.x + this.validatedButton.getWidth())) &&
-						 (mouseY >= this.validatedButton.y) &&
-						 (mouseY < (this.validatedButton.y + this.validatedButton.getHeight())))
+				else if ((mouseX >= validatedButton.getX()) &&
+						(mouseX < (validatedButton.getX() + validatedButton.getWidth())) &&
+						(mouseY >= validatedButton.getY()) &&
+						(mouseY < (validatedButton.getY() + validatedButton.getHeight())))
 				{
 					// Tooltip for the validation button.
-					this.tooltipText = (this.validatedButton.isValid()) ? I18n.get(I18N_VALID) : I18n.get(I18N_INVALID);
+					tooltipText = (validatedButton.isValid()) ? I18N.getOrDefault(I18N_VALID) : I18N.getOrDefault(I18N_INVALID);
 				}
-				else if (this.annotation.needsWorldRestart() &&
-						 (mouseX >= this.needsWorldRestartButton.x) &&
-						 (mouseX < (this.needsWorldRestartButton.x + this.needsWorldRestartButton.getWidth())) &&
-						 (mouseY >= this.needsWorldRestartButton.y) &&
-						 (mouseY < (this.needsWorldRestartButton.y + this.needsWorldRestartButton.getHeight())))
+				else if (annotation.needsWorldRestart() &&
+						(mouseX >= needsWorldRestartButton.getX()) &&
+						(mouseX < (needsWorldRestartButton.getX() + needsWorldRestartButton.getWidth())) &&
+						(mouseY >= needsWorldRestartButton.getY()) &&
+						(mouseY < (needsWorldRestartButton.getY() + needsWorldRestartButton.getHeight())))
 				{
 					// Tooltip for the needs world restart button.
-					this.tooltipText = I18n.get(I18N_NEEDS_WORLD_RESTART);
+					tooltipText = I18N.getOrDefault(I18N_NEEDS_WORLD_RESTART);
 				}
 				else
 				{
-					this.tooltipText = null;
+					tooltipText = null;
 				}
 			}
 
@@ -479,22 +510,13 @@ public class ConfigGui extends Screen
 			}
 
 			@Override
-			public void tick()
-			{
-				if (this.editBox != null)
-				{
-					this.editBox.tick();
-				}
-			}
-
-			@Override
 			public String getTooltip()
 			{
 				return this.tooltipText;
 			}
 
 			// Sets the state of the ValidationStatusButton button based on the input in the EditBox.
-			private boolean validateTextFieldInput(String text)
+			private void validateTextFieldInput(String text)
 			{
 				Object value;
 
@@ -530,8 +552,18 @@ public class ConfigGui extends Screen
 				{
 					this.validatedButton.setInvalid();
 				}
+			}
 
-				return true;
+			@Override
+			public List<? extends NarratableEntry> narratables()
+			{
+				return List.of();
+			}
+
+			@Override
+			public List<? extends GuiEventListener> children()
+			{
+				return List.of(optionLabel, editBox, checkBox, enumButton, validatedButton, needsWorldRestartButton);
 			}
 		}
 	}
