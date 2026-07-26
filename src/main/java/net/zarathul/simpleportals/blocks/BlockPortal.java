@@ -3,7 +3,6 @@ package net.zarathul.simpleportals.blocks;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.resources.ResourceKey;
@@ -12,11 +11,11 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.InsideBlockEffectApplier;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
@@ -28,26 +27,24 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.level.material.PushReaction;
-import net.minecraft.world.phys.shapes.BooleanOp;
+import net.minecraft.world.level.portal.TeleportTransition;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.zarathul.simpleportals.Settings;
 import net.zarathul.simpleportals.SimplePortals;
-import net.zarathul.simpleportals.common.TeleportTask;
-import net.zarathul.simpleportals.mixin.EntityAccessor;
 import net.zarathul.simpleportals.registration.Portal;
 import net.zarathul.simpleportals.registration.PortalRegistry;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
  * Represents the actual portals in the center of the portal multi-block.
  */
-public class BlockPortal extends Block
+public class BlockPortal extends Block implements net.minecraft.world.level.block.Portal
 {
 	private static final VoxelShape X_AABB = Block.box(6.0D, 0.0D, 0.0D, 10.0D, 16.0D, 16.0D);
 	private static final VoxelShape Y_AABB = Block.box(0.0D, 6.0D, 0.0D, 16.0D, 10.0D, 16.0D);
@@ -94,165 +91,8 @@ public class BlockPortal extends Block
 	@Override
 	protected void entityInside(BlockState state, Level world, BlockPos pos, Entity entity, InsideBlockEffectApplier effectApplier, boolean isPrecise)
 	{
-		if (!world.isClientSide() && entity.isAlive() && !entity.isPassenger() && !entity.isVehicle() && entity.canUsePortal(false) &&
-			Shapes.joinIsNotEmpty(Shapes.create(entity.getBoundingBox().move(-pos.getX(), -pos.getY(), -pos.getZ())), state.getShape(world, pos), BooleanOp.AND))
-		{
-			// For players a configurable cooldown is used instead of the value provided by getPortalCooldown(), because
-			// that value is very small. A small value is fine for vanilla teleportation mechanics but can cause issues
-			// for this mod.
-			int cooldown = (entity instanceof ServerPlayer) ? Settings.playerTeleportationCooldown : entity.getDimensionChangingDelay();
-			if (entity.isOnPortalCooldown()) return;
-
-			Level entityLevel = null;
-			try (var level = entity.level())
-			{
-				entityLevel = level;
-			}
-			catch (Exception _) { return; }
-
-			List<Portal> portals = SimplePortals.portalRegistry.getPortalsAt(pos, entityLevel.dimension());
-			
-			if (portals == null || portals.isEmpty()) return;
-
-			MinecraftServer mcServer = entityLevel.getServer();
-			if (mcServer == null) return;
-
-			Portal start = portals.getFirst();
-
-			// Handle power source entering the portal
-			
-			if (entity instanceof ItemEntity && Settings.powerCost > 0 && Settings.powerCapacity > 0)
-			{
-				ItemStack itemStack = ((ItemEntity)entity).getItem();
-
-				if (Settings.powerSourceTag == null)
-				{
-					SimplePortals.log.error("Misconfigured portal power source. The item tag '{}' could not be found.", Settings.powerSource);
-					return;
-				}
-
-				if ((SimplePortals.portalRegistry.getPortalPower(start) < Settings.powerCapacity) && itemStack.is(Settings.powerSourceTag))
-				{
-					int surplus = SimplePortals.portalRegistry.addPower(start, itemStack.getCount());
-
-					SimplePortals.portalRegistry.updatePowerGauges((ServerLevel)world, start);
-					
-					if (surplus > 0)
-					{
-						itemStack.setCount(surplus);
-					}
-					else
-					{
-						entity.discard();
-					}
-
-					return;
-				}
-			}
-			
-			// Bypass the power cost for players in creative mode
-			boolean bypassPowerCost = (entity instanceof ServerPlayer && ((ServerPlayer)entity).isCreative());
-			
-			// Check if portal has enough power for a port
-			if (!bypassPowerCost && SimplePortals.portalRegistry.getPortalPower(start) < Settings.powerCost) return;
-			
-			portals = SimplePortals.portalRegistry.getPortalsWithAddress(start.address());
-			
-			if (portals == null || portals.size() < 2) return;
-			
-			// Get a list of possible destination portals (portals with the same address)
-			List<Portal> destinations = portals.stream()
-				.filter(e -> !e.equals(start))
-				.collect(Collectors.toList());
-			
-			if (!destinations.isEmpty())
-			{
-				// Shuffle the destinations to make the exit portal random.
-				Collections.shuffle(destinations);
-
-				int entityHeight = Mth.ceil(entity.getBbHeight());
-				ServerLevel destinationWorld = null;
-				ResourceKey<Level> dimension = null;
-				BlockPos destinationPos = null;
-				Portal destinationPortal = null;
-
-				// Pick the first not blocked destination portal
-				for (Portal portal : destinations)
-				{
-					dimension = portal.dimension();
-					if (dimension == null) continue;
-
-					destinationWorld = mcServer.getLevel(dimension);
-					destinationPos = portal.getPortDestination(destinationWorld, entityHeight);
-					
-					if (destinationPos != null)
-					{
-						destinationPortal = portal;
-						break;
-					}
-				}
-				
-				if ((destinationPos != null && destinationWorld != null) && (bypassPowerCost || Settings.powerCost == 0 || SimplePortals.portalRegistry.removePower(start, Settings.powerCost)))
-				{
-					// Get a facing pointing away from the destination portal. After porting, the portal 
-					// will always be behind the entity. When porting to a horizontal portal the initial
-					// facing is not changed.
-					Direction entityFacing = (destinationPortal.axis() == Axis.Y)
-						? entity.getDirection()
-						: (destinationPortal.axis() == Axis.Z)
-						? (destinationPos.getZ() > destinationPortal.corner1().pos().getZ())
-						? Direction.SOUTH
-						: Direction.NORTH
-						: (destinationPos.getX() > destinationPortal.corner1().pos().getX())
-						? Direction.EAST
-						: Direction.WEST;
-					
-					if (entity instanceof ServerPlayer)
-					{
-						// Player teleportations are queued to avoid at least some of the problems that arise from
-						// handling player teleportation inside an entity collision handler. There seem to be all
-						// kinds of weird race conditions of movement packets that trigger the dreaded "moved wrongly"
-						// and "moved to quickly" checks in 'ServerGamePacketListenerImpl.handleMovePlayer()'. No idea
-						// why end portals don't have these problems, considering that I use the same copy and pasted
-						// code minus the platform generation stuff.
-						try
-						{
-							SimplePortals.TELEPORT_QUEUE.put(new TeleportTask(
-									mcServer.getTickCount(),
-									(ServerPlayer)entity,
-									destinationPortal.dimension(),
-									destinationPos,
-									entityFacing));
-						}
-						catch (InterruptedException ex)
-						{
-							SimplePortals.log.error("Failed to enqueue teleportation task for player '{}' to dimension '{}'.",
-													entity.getName(),
-													destinationPortal.dimension());
-						}
-					}
-					else
-					{
-//						entity = Utils.teleportTo(entity, destinationPortal.getDimension(), destinationPos, entityFacing);
-						entity.teleportTo(
-							mcServer.getLevel(destinationPortal.dimension()),
-							destinationPos.getX(),
-							destinationPos.getY(),
-							destinationPos.getZ(),
-							Set.of(),
-							entity.getXRot(),
-							entity.getYRot(),
-							false
-						);
-					}
-
-					SimplePortals.portalRegistry.updatePowerGauges((ServerLevel)world, start);
-				}
-			}
-
-			// Put the entity on "cooldown" in order to prevent it from instantly porting again.
-			((EntityAccessor)entity).setPortalCooldown(cooldown);
-		}
+		if (handlePowerSourceEnteringPortal(world, pos, entity)) return;
+		if (entity.canUsePortal(false)) entity.setAsInsidePortal(this, pos);
 	}
 
 	@Override
@@ -326,5 +166,112 @@ public class BlockPortal extends Block
 				world.addParticle(ParticleTypes.PORTAL, d0, d1, d2, d3, d4, d5);
 			}
 		}
+	}
+
+	@Override
+	public int getPortalTransitionTime(ServerLevel level, Entity entity)
+	{
+		return (entity instanceof Player) ? Settings.playerTeleportationCooldown : 0;
+	}
+
+	@Override
+	public @Nullable TeleportTransition getPortalDestination(ServerLevel currentLevel, Entity entity, BlockPos portalEntryPos)
+	{
+		PortalRegistry registry = SimplePortals.portalRegistry;
+		Portal startPortal = registry.getPortalsAt(portalEntryPos, currentLevel.dimension()).getFirst();
+
+		List<Portal> potentialDestinationPortals = registry.getPortalsWithAddress(startPortal.address()).stream()
+			.filter(e -> !e.equals(startPortal))
+			.collect(Collectors.toList());
+
+		// There has to be at least one potential destination portal with the same address
+		if (potentialDestinationPortals.isEmpty()) return null;
+
+		// Shuffle the destinations to make the exit portal random.
+		Collections.shuffle(potentialDestinationPortals);
+
+		ServerLevel destinationWorld = null;
+		ResourceKey<Level> dimension = null;
+		PortalRegistry.TeleportationDestination destination = null;
+		MinecraftServer server = currentLevel.getServer();
+
+		// Pick the first not blocked destination portal
+		for (Portal portal : potentialDestinationPortals)
+		{
+			dimension = portal.dimension();
+			destinationWorld = server.getLevel(dimension);
+			if (destinationWorld == null) continue;
+
+			destination = PortalRegistry.getTeleportDestination(portal, destinationWorld, entity);
+
+			if (destination != null) break;
+		}
+
+		// Bypass the power cost for players in creative mode
+		boolean bypassPowerCost = (entity instanceof ServerPlayer && ((ServerPlayer)entity).isCreative());
+
+		if (destination != null && (bypassPowerCost || Settings.powerCost == 0 || SimplePortals.portalRegistry.removePower(startPortal, Settings.powerCost)))
+		{
+			TeleportTransition.PostTeleportTransition postTransition = TeleportTransition.PLACE_PORTAL_TICKET;
+			if (Settings.teleportationSoundEnabled) postTransition = postTransition.then(TeleportTransition.PLAY_PORTAL_SOUND);
+			Vec3 destinationVector = new Vec3(destination.pos().getX() + 0.5d, destination.pos().getY() + 0.5d, destination.pos().getZ() + 0.5d);
+
+			return new TeleportTransition(destinationWorld, destinationVector, Vec3.ZERO, destination.facing().toYRot(), entity.xRotO, postTransition);
+		}
+		else
+		{
+			// TODO: Make sound configurable
+			currentLevel.playSound(null, portalEntryPos, SoundEvents.END_PORTAL_FRAME_FILL, SoundSource.BLOCKS);
+			return null;
+		}
+	}
+
+	@Override
+	public Transition getLocalTransition()
+	{
+		return (Settings.teleportationTransitionEffectEnabled) ? Transition.CONFUSION : Transition.NONE;
+	}
+
+	private boolean handlePowerSourceEnteringPortal(Level world, BlockPos pos, Entity entity)
+	{
+		if (entity instanceof ItemEntity && Settings.powerCost > 0 && Settings.powerCapacity > 0)
+		{
+			if (Settings.powerSourceTag == null)
+			{
+				SimplePortals.log.error("Misconfigured portal power source. The item tag '{}' could not be found.", Settings.powerSource);
+				return false;
+			}
+
+			ItemStack itemStack = ((ItemEntity)entity).getItem();
+			if (!itemStack.is(Settings.powerSourceTag)) return false;
+
+			List<Portal> portals = SimplePortals.portalRegistry.getPortalsAt(pos, world.dimension());
+			if (portals.isEmpty()) return false;
+
+			MinecraftServer server = world.getServer();
+			if (server == null) return false;
+
+			Portal portal = portals.getFirst();
+
+			if ((SimplePortals.portalRegistry.getPortalPower(portal) < Settings.powerCapacity))
+			{
+				int surplus = SimplePortals.portalRegistry.addPower(portal, itemStack.getCount());
+
+				SimplePortals.portalRegistry.updatePowerGauges((ServerLevel)world, portal);
+
+				if (surplus > 0)
+				{
+					itemStack.setCount(surplus);
+				}
+				else
+				{
+					entity.discard();
+				}
+
+				return true;
+			}
+		}
+
+		return false;
 	}
 }

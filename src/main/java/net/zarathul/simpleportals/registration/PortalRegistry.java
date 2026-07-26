@@ -1,17 +1,18 @@
 package net.zarathul.simpleportals.registration;
 
-import com.google.common.collect.*;
-import com.mojang.datafixers.util.Pair;
-import com.mojang.serialization.*;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ListMultimap;
+import com.google.common.collect.Maps;
+import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -23,61 +24,25 @@ import net.zarathul.simpleportals.blocks.BlockPortal;
 import net.zarathul.simpleportals.common.Utils;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * The central registration for all portals.
  */
 public final class PortalRegistry extends SavedData
 {
-	public record PortalEntry(BlockPos pos, Portal portal)
-	{
-		public static final Codec<PortalEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-			BlockPos.CODEC.fieldOf("pos").forGetter(PortalEntry::pos),
-			Portal.CODEC.fieldOf("portal").forGetter(PortalEntry::portal)
-		).apply(instance, PortalEntry::new));
-	}
-
-	public record AddressEntry(Address address, Portal portal)
-	{
-		public static final Codec<AddressEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-			Address.CODEC.fieldOf("address").forGetter(AddressEntry::address),
-			Portal.CODEC.fieldOf("portal").forGetter(AddressEntry::portal)
-		).apply(instance, AddressEntry::new));
-	}
-
-	public record GaugeEntry(Portal portal, BlockPos pos)
-	{
-		public static final Codec<GaugeEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-			Portal.CODEC.fieldOf("portal").forGetter(GaugeEntry::portal),
-			BlockPos.CODEC.fieldOf("pos").forGetter(GaugeEntry::pos)
-		).apply(instance, GaugeEntry::new));
-	}
-
-	public record PowerEntry(Portal portal, int power)
-	{
-		public static final Codec<PowerEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-			Portal.CODEC.fieldOf("portal").forGetter(PowerEntry::portal),
-			Codec.INT.fieldOf("power").forGetter(PowerEntry::power)
-		).apply(instance, PowerEntry::new));
-	}
-
-	public static final Codec<PortalRegistry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-			Codec.list(PortalEntry.CODEC).fieldOf("portals").forGetter(PortalRegistry::portals),
-			Codec.list(AddressEntry.CODEC).fieldOf("addresses").forGetter(PortalRegistry::addresses),
-			Codec.list(GaugeEntry.CODEC).fieldOf("gauges").forGetter(PortalRegistry::gauges),
-			Codec.list(PowerEntry.CODEC).fieldOf("power").forGetter(PortalRegistry::power)
-		).apply(instance, PortalRegistry::new)
-	);
-
-	public static final SavedDataType<PortalRegistry> TYPE = new SavedDataType<>(Utils.createModIdentifier("portal_registry"), PortalRegistry::new, CODEC, null	);
-
 	private final ImmutableMap<Direction,Direction[]> cornerSearchDirs;
 	private final ListMultimap<BlockPos, Portal> portals;
 	private final ListMultimap<Address, Portal> addresses;
 	private final ListMultimap<Portal, BlockPos> gauges;
 	private final HashMap<Portal, Integer> power;
 
+	/**
+	 * Gets all registered portal positions alongside the respective portals.
+	 * Primarily used for serialization.
+	 *
+	 * @return
+	 * A list of {@link PortalEntry}s consisting of the portals position and the portal itself.
+	 */
 	public List<PortalEntry> portals()
 	{
 		var portalEntries = new ArrayList<PortalEntry>(portals.size());
@@ -86,6 +51,13 @@ public final class PortalRegistry extends SavedData
 		return portalEntries;
 	}
 
+	/**
+	 * Gets all registered addresses alongside the respective portals.
+	 * Primarily used for serialization.
+	 *
+	 * @return
+	 * A list of {@link AddressEntry}s consisting of the portals address and the portal itself.
+	 */
 	public List<AddressEntry> addresses()
 	{
 		var addressEntries = new ArrayList<AddressEntry>(addresses.size());
@@ -94,6 +66,13 @@ public final class PortalRegistry extends SavedData
 		return addressEntries;
 	}
 
+	/**
+	 * Gets all registered portals with power gauges, alongside the power gauges in those portals.
+	 * Primarily used for serialization.
+	 *
+	 * @return
+	 * A list of {@link GaugeEntry}s consisting of the portals and the position of the power gauge.
+	 */
 	public List<GaugeEntry> gauges()
 	{
 		var gaugeEntries = new ArrayList<GaugeEntry>(gauges.size());
@@ -102,6 +81,13 @@ public final class PortalRegistry extends SavedData
 		return gaugeEntries;
 	}
 
+	/**
+	 * Gets all registered portals alongside their respective power values.
+	 * Primarily used for serialization.
+	 *
+	 * @return
+	 * A list of {@link PowerEntry}s consisting of the portals and their power values.
+	 */
 	public List<PowerEntry> power()
 	{
 		var powerEntries = new ArrayList<PowerEntry>(power.size());
@@ -113,20 +99,6 @@ public final class PortalRegistry extends SavedData
 	public PortalRegistry()
 	{
 		this(new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
-
-//		EnumMap<Direction,Direction[]> temp = Maps.newEnumMap(Direction.class);
-//		temp.put(Direction.DOWN, new Direction[] { Direction.SOUTH, Direction.EAST });
-//		temp.put(Direction.UP, new Direction[] { Direction.SOUTH, Direction.EAST });
-//		temp.put(Direction.NORTH, new Direction[] { Direction.DOWN, Direction.EAST });
-//		temp.put(Direction.SOUTH, new Direction[] { Direction.DOWN, Direction.EAST });
-//		temp.put(Direction.WEST, new Direction[] { Direction.DOWN, Direction.SOUTH });
-//		temp.put(Direction.EAST, new Direction[] { Direction.DOWN, Direction.SOUTH });
-//		cornerSearchDirs = Maps.immutableEnumMap(temp);
-//
-//		portals = ArrayListMultimap.create();
-//		addresses = ArrayListMultimap.create();
-//		gauges = ArrayListMultimap.create();
-//		power = Maps.newHashMap();
 	}
 
 	public PortalRegistry(List<PortalEntry> portals, List<AddressEntry> addresses, List<GaugeEntry> gauges, List<PowerEntry> power)
@@ -166,6 +138,7 @@ public final class PortalRegistry extends SavedData
 		gauges.clear();
 		power.clear();
 
+		// Trigger save of portal data
 		setDirty();
 	}
 	
@@ -347,38 +320,6 @@ public final class PortalRegistry extends SavedData
 	}
 
 	/**
-	 * Gets all registered portals and their positions.
-	 *
- 	 * @return
-	 * An immutable map containing all portals and their positions.
-	 */
-//	public ImmutableListMultimap<BlockPos, Portal> getPortals()
-//	{
-//		return ImmutableListMultimap.copyOf(portals);
-//	}
-
-	/**
-	 * Gets all registered portals and their addresses.
-	 *
-	 * @return
-	 * An immutable map containing all portals and their addresses.
-	 */
-//	public ImmutableListMultimap<Address, Portal> getAddresses()
-//	{
-//		return ImmutableListMultimap.copyOf(addresses);
-//	}
-//
-//	public ImmutableListMultimap<Portal, BlockPos> getGauges()
-//	{
-//		return ImmutableListMultimap.copyOf(gauges);
-//	}
-//
-//	public HashMap<Portal, Integer> getPower()
-//	{
-//		return power;
-//	}
-
-	/**
 	 * Gets the portals registered at the specified position in the
 	 * specified dimension.
 	 * 
@@ -483,7 +424,6 @@ public final class PortalRegistry extends SavedData
 		power.put(portal, oldAmount + amountToAdd);
 		
 		// Trigger save of portal data
-		
 		setDirty();
 		
 		return surplus;
@@ -511,7 +451,6 @@ public final class PortalRegistry extends SavedData
 		power.put(portal, oldAmount - amount);
 		
 		// Trigger save of portal data
-		
 		setDirty();
 		
 		return true;
@@ -549,7 +488,210 @@ public final class PortalRegistry extends SavedData
 			world.updateNeighbourForOutputSignal(pos, SimplePortals.blockPowerGauge);
 		}
 	}
-	
+
+	/***
+	 * Gets a location in direct vicinity of the portal where an entity can be transported to and
+	 * a facing direction for the entity looking away from the portal.
+	 *
+	 * @param portal
+	 * The {@link Portal} to teleport to.
+	 * @param world
+	 * The {@link ServerLevel} the portal is located in.
+	 * @param entity
+	 * The {@link Entity} which is supposed to be teleported.
+	 * @return
+	 * A {@link TeleportationDestination}, or <code>null</code> if no location could be found.
+	 */
+	public static TeleportationDestination getTeleportDestination(Portal portal, ServerLevel world, Entity entity)
+	{
+		BlockPos destinationPos = getPortDestination(portal, world, (int)Math.ceil(entity.getBbHeight()));
+		if (destinationPos == null) return null;
+
+		// Get a facing pointing away from the destination portal. After porting, the portal
+		// will always be behind the entity. When porting to a horizontal portal the initial
+		// facing is not changed.
+		Direction entityFacing = switch (portal.axis())
+		{
+			case X -> (destinationPos.getX() > portal.corner1().pos().getX()) ? Direction.EAST : Direction.WEST;
+			case Y -> entity.getDirection();
+			case Z -> (destinationPos.getZ() > portal.corner1().pos().getZ()) ? Direction.SOUTH : Direction.NORTH;
+		};
+
+		return new TeleportationDestination(destinationPos, entityFacing);
+	}
+
+	/**
+	 * Gets a possible spawn location for an entity of the specified height for a given portal.
+	 *
+	 * @param portal
+	 * The {@link Portal} which to find the spawn location for.
+	 * @param world
+	 * The {@link ServerLevel} the portal is located in.
+	 * @param entityHeight
+	 * The height of the entity the spawn point should be searched for.
+	 * @return
+	 * A {@link BlockPos} representing a possible spawn location or <code>null</code>.
+	 */
+	public static BlockPos getPortDestination(Portal portal, ServerLevel world, int entityHeight)
+	{
+		if (world == null || entityHeight < 1) return null;
+
+		// Horizontal portal.
+
+		if (portal.axis() == Axis.Y)
+		{
+			List<BlockPos> framePositions = portal.getFramePositions();
+
+			BlockPos spawnLocation;
+
+			// Check for valid spawn positions on top of the frame blocks.
+
+			for (BlockPos framePos : framePositions)
+			{
+				spawnLocation = framePos.above();
+				if (canEntitySpawnAt(world, spawnLocation, entityHeight)) return spawnLocation;
+			}
+
+			// Check for valid spawn positions below the portal blocks starting at the center.
+
+			BlockPos portal1 = portal.corner1().getInnerCornerPos();
+			BlockPos portal2 = portal.corner4().getInnerCornerPos();
+			Axis[] portalAxis = new Axis[] { Axis.X, Axis.Z };
+			int[] mins = new int[2];
+			int[] maxes = new int[2];
+
+			for (int i = 0; i < portalAxis.length; i++)
+			{
+				if (Utils.getAxisValue(portal1, portalAxis[i]) < Utils.getAxisValue(portal2, portalAxis[i]))
+				{
+					mins[i] = Utils.getAxisValue(portal1, portalAxis[i]);
+					maxes[i] = Utils.getAxisValue(portal2, portalAxis[i]);
+				}
+				else
+				{
+					mins[i] = Utils.getAxisValue(portal2, portalAxis[i]);
+					maxes[i] = Utils.getAxisValue(portal1, portalAxis[i]);
+				}
+			}
+
+			int minX = mins[0];
+			int maxX = maxes[0];
+			int minZ = mins[1];
+			int maxZ = maxes[1];
+			int y = portal1.getY() - entityHeight;
+			int width = Math.abs(maxX - minX) + 1;
+			int height = Math.abs(maxZ - minZ) + 1;
+			int halfWidth = Math.floorDiv(width, 2);
+			int halfHeight = Math.floorDiv(height, 2);
+
+			Direction[] zAxisFacings = new Direction[] { Direction.SOUTH, Direction.NORTH };
+			BlockPos center = new BlockPos(minX + halfWidth, y, minZ + halfHeight);
+			BlockPos currentPos;
+
+			for (int z = 0; z <= halfHeight; z++)
+			{
+				for (Direction zFacing : zAxisFacings)
+				{
+					for (int x = 0; x <= halfWidth; x++)
+					{
+						currentPos = center.east(x).relative(zFacing, z);
+
+						if (currentPos.getX() <= maxX && currentPos.getZ() <= maxZ)
+						{
+							if (canEntitySpawnAt(world, currentPos, entityHeight)) return currentPos;
+						}
+
+						currentPos = center.west(x).relative(zFacing, z);
+
+						if (currentPos.getX() >= minX && currentPos.getZ() >= minZ)
+						{
+							if (canEntitySpawnAt(world, currentPos, entityHeight)) return currentPos;
+						}
+					}
+				}
+			}
+
+			return null;
+		}
+
+		// Vertical portal.
+
+		BlockPos portal1 = portal.corner1().getInnerCornerPos();
+		BlockPos portal2 = portal.corner4().getInnerCornerPos();
+		int width, height, lowBound, highBound;
+
+		// Get the axis for possible spawn locations and the corresponding
+		// axis values for the 2 corner portal blocks.
+		Axis cornerAxis = Utils.getOrthogonalTo(portal.axis());
+		int portal1AxisValue = Utils.getAxisValue(portal1, cornerAxis);
+		int portal2AxisValue = Utils.getAxisValue(portal2, cornerAxis);
+
+		width = Math.abs(portal1AxisValue - portal2AxisValue) + 1;
+		height = Math.abs(portal1.getY() - portal2.getY()) + 1;
+
+		if (portal1AxisValue < portal2AxisValue)
+		{
+			lowBound = portal1AxisValue;
+			highBound = portal2AxisValue;
+		}
+		else
+		{
+			lowBound = portal2AxisValue;
+			highBound = portal1AxisValue;
+		}
+
+		int halfWidth = Math.floorDiv(width, 2);
+		int middle = lowBound + halfWidth;
+		int startHeight = Math.min(portal1.getY(), portal2.getY());
+
+		// e.g. Axis.Z and AxisDirection.POSITIVE returns Direction.SOUTH.
+		Direction searchDirPositive = Direction.fromAxisAndDirection(cornerAxis, Direction.AxisDirection.POSITIVE);
+		Direction searchDirNegative = Direction.fromAxisAndDirection(cornerAxis, Direction.AxisDirection.NEGATIVE);
+
+		BlockPos searchStartPos1 = (portal.axis() == Axis.Z)
+								   ? new BlockPos(middle, startHeight, portal1.south(1).getZ())
+								   : new BlockPos(portal1.east(1).getX(), startHeight, middle);
+
+		BlockPos searchStartPos2 = (portal.axis() == Axis.Z)
+								   ? new BlockPos(middle, startHeight, portal1.north(1).getZ())
+								   : new BlockPos(portal1.west(1).getX(), startHeight, middle);
+
+		BlockPos[] searchStartPositions = new BlockPos[] { searchStartPos1, searchStartPos2 };
+
+		BlockPos feetPos;
+		BlockPos currentFeetPos;
+
+		// Find the lowest position where the entity can spawn at either side.
+		// Search order is south before north and east before west.
+
+		for (int y = 0; y <= height - entityHeight; y++)
+		{
+			for (BlockPos startPos : searchStartPositions)
+			{
+				currentFeetPos = startPos.above(y);
+
+				for (int x = 0; x <= halfWidth; x++)
+				{
+					feetPos = currentFeetPos.relative(searchDirPositive, x);
+
+					if (Utils.getAxisValue(feetPos, cornerAxis) <= highBound)
+					{
+						if (canEntitySpawnAt(world, feetPos, entityHeight)) return feetPos;
+					}
+
+					feetPos = currentFeetPos.relative(searchDirNegative, x);
+
+					if (Utils.getAxisValue(feetPos, cornerAxis) >= lowBound)
+					{
+						if (canEntitySpawnAt(world, feetPos, entityHeight)) return feetPos;
+					}
+				}
+			}
+		}
+
+		return null;
+	}
+
 	/**
 	 * Generates an address block id for the specified block.
 	 * 
@@ -640,7 +782,32 @@ public final class PortalRegistry extends SavedData
 		
 		return null;
 	}
-	
+
+	/**
+	 * Check if an entity of the specified height can spawn at the specified
+	 * position.
+	 *
+	 * @param world
+	 * The {@link ServerLevel} to check in.
+	 * @param pos
+	 * The position of the lowest point (feet) of the entity.
+	 * @param entityHeight
+	 * The entities' height.
+	 * @return
+	 * <code>true</code> if the entity can spawn at the location, otherwise <code>false</code>.
+	 */
+	private static boolean canEntitySpawnAt(ServerLevel world, BlockPos pos, int entityHeight)
+	{
+		if (world == null || pos == null || entityHeight < 1) return false;
+
+		for (int i = 0; i < entityHeight; i ++)
+		{
+			if (!world.isEmptyBlock(pos.above(i))) return false;
+		}
+
+		return true;
+	}
+
 	/**
 	 * Registers the specified portal. 
 	 * 
@@ -667,7 +834,6 @@ public final class PortalRegistry extends SavedData
 		updatePowerGauges(world, portal);
 		
 		// Trigger save of portal data
-		
 		setDirty();
 	}
 	
@@ -697,7 +863,6 @@ public final class PortalRegistry extends SavedData
 		gaugesToRemove.forEach(pos -> gauges.remove(portal, pos));
 		
 		// Trigger save of portal data
-		
 		setDirty();
 	}
 	
@@ -734,137 +899,49 @@ public final class PortalRegistry extends SavedData
 	{
 		return (state != null && !state.hasBlockEntity() && !state.isAir());
 	}
-	
-	/**
-	 * Writes the registry data to a NBT compound tag.
-	 * 
-	 * @param nbt
-	 * The {@link CompoundTag} to save the registry data in.
-	 */
-//	public void writeToNBT(CompoundTag nbt)
-//	{
-//		if (nbt == null) return;
-//
-//		CompoundTag portalsTag = new CompoundTag();
-//		CompoundTag portalBlocksTag = new CompoundTag();
-//		CompoundTag powerTag = new CompoundTag();
-//		CompoundTag subTag;
-//
-//		// Serialization of all Portals into a list.
-//
-//		int i = 0;
-//		HashMap<Portal, Integer> portalIDs = Maps.newHashMap();
-//		Set<Portal> uniquePortals = new HashSet<>(portals.values());
-//
-//		for (Portal portal : uniquePortals)
-//		{
-//			portalIDs.put(portal, i);
-//			powerTag.putInt(String.valueOf(i), power.get(portal));
-//			portalsTag.put(String.valueOf(i++), portal.serializeNBT());
-//		}
-//
-//		i = 0;
-//		int x = 0;
-//
-//		// Serialization of BlockPos to Portal map.
-//
-//		for (BlockPos pos : portals.keySet())
-//		{
-//			subTag = new CompoundTag();
-//			subTag.putLong("pos", pos.asLong());
-//			subTag.putBoolean("isGauge", gauges.containsValue(pos));
-//
-//			for (Portal portal : portals.get(pos))
-//			{
-//				subTag.putInt("portal" + x++, portalIDs.get(portal));
-//			}
-//
-//			x = 0;
-//
-//			portalBlocksTag.put(String.valueOf(i++), subTag);
-//		}
-//
-//		nbt.put("portals", portalsTag);
-//		nbt.put("portalBlocks", portalBlocksTag);
-//		nbt.put("power", powerTag);
-//	}
-//
-//	/**
-//	 * Reads the registry data from a NBT compound tag.
-//	 *
-//	 * @param nbt
-//	 * The {@link CompoundTag} to read the registry data from.
-//	 */
-//	public void readFromNBT(CompoundTag nbt)
-//	{
-//		if (nbt == null) return;
-//
-//		portals.clear();
-//		addresses.clear();
-//
-//		CompoundTag portalsTag = nbt.getCompound("portals").get();
-//		CompoundTag portalBlocksTag = nbt.getCompound("portalBlocks").get();
-//		CompoundTag powerTag = nbt.getCompound("power").get();
-//
-//		int i = 0;
-//		String key;
-//		CompoundTag tag;
-//		Portal portal;
-//
-//		// Get the portals and their IDs.
-//
-//		HashMap<Integer, Portal> portalIDs = Maps.newHashMap();
-//
-//		while(portalsTag.contains(key = String.valueOf(i)))
-//		{
-//			tag = portalsTag.getCompound(key).get();
-//
-//			portal = new Portal();
-//			portal.deserializeNBT(tag);
-//
-//			portalIDs.put(i++, portal);
-//		}
-//
-//		// Deserialization of BlockPos to Portal map.
-//
-//		i = 0;
-//		int x = 0;
-//		String subKey;
-//		BlockPos portalPos;
-//		boolean isGauge;
-//
-//		while (portalBlocksTag.contains(key = String.valueOf(i++)))
-//		{
-//			tag = portalBlocksTag.getCompound(key).get();
-//
-//			portalPos = BlockPos.of(tag.getLong("pos").get());
-//			isGauge = tag.getBoolean("isGauge").get();
-//
-//			while (tag.contains(subKey = "portal" + x++))
-//			{
-//				portal = portalIDs.get(tag.getInt(subKey));
-//				portals.put(portalPos, portal);
-//
-//				if (isGauge) gauges.put(portal, portalPos);
-//			}
-//
-//			x = 0;
-//		}
-//
-//		// Regeneration of Address to Portal map.
-//
-//		for (Portal p : portalIDs.values())
-//		{
-//			addresses.put(p.getAddress(), p);
-//		}
-//
-//		// Generate power map.
-//
-//		i = 0;
-//
-//		while (powerTag.contains(key = String.valueOf(i)))
-//		{
-//			power.put(portalIDs.get(i++), powerTag.getInt(key).get());
-//		}
-//	}
+
+	public record TeleportationDestination(BlockPos pos, Direction facing) {}
+
+	// Used for serialization. Using these as an intermediary step is a workaround, because I could not figure out how to serialize ArrayListMultimap directly.
+	public record PortalEntry(BlockPos pos, Portal portal)
+	{
+		public static final Codec<PortalEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+				BlockPos.CODEC.fieldOf("pos").forGetter(PortalEntry::pos),
+				Portal.CODEC.fieldOf("portal").forGetter(PortalEntry::portal)
+		).apply(instance, PortalEntry::new));
+	}
+
+	public record AddressEntry(Address address, Portal portal)
+	{
+		public static final Codec<AddressEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+				Address.CODEC.fieldOf("address").forGetter(AddressEntry::address),
+				Portal.CODEC.fieldOf("portal").forGetter(AddressEntry::portal)
+		).apply(instance, AddressEntry::new));
+	}
+
+	public record GaugeEntry(Portal portal, BlockPos pos)
+	{
+		public static final Codec<GaugeEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+				Portal.CODEC.fieldOf("portal").forGetter(GaugeEntry::portal),
+				BlockPos.CODEC.fieldOf("pos").forGetter(GaugeEntry::pos)
+		).apply(instance, GaugeEntry::new));
+	}
+
+	public record PowerEntry(Portal portal, int power)
+	{
+		public static final Codec<PowerEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+				Portal.CODEC.fieldOf("portal").forGetter(PowerEntry::portal),
+				Codec.INT.fieldOf("power").forGetter(PowerEntry::power)
+		).apply(instance, PowerEntry::new));
+	}
+
+	public static final Codec<PortalRegistry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+					Codec.list(PortalEntry.CODEC).fieldOf("portals").forGetter(PortalRegistry::portals),
+					Codec.list(AddressEntry.CODEC).fieldOf("addresses").forGetter(PortalRegistry::addresses),
+					Codec.list(GaugeEntry.CODEC).fieldOf("gauges").forGetter(PortalRegistry::gauges),
+					Codec.list(PowerEntry.CODEC).fieldOf("power").forGetter(PortalRegistry::power)
+			).apply(instance, PortalRegistry::new)
+	);
+
+	public static final SavedDataType<PortalRegistry> TYPE = new SavedDataType<>(Utils.createModIdentifier("portal_registry"), PortalRegistry::new, CODEC, null	);
 }

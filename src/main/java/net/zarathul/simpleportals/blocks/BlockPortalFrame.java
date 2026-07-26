@@ -3,6 +3,8 @@ package net.zarathul.simpleportals.blocks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -13,14 +15,15 @@ import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.SingleThreadedRandomSource;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.redstone.Orientation;
 import net.minecraft.world.phys.BlockHitResult;
 import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.registration.Portal;
-import net.zarathul.simpleportals.registration.PortalRegistry;
 import org.jspecify.annotations.Nullable;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -28,6 +31,8 @@ import java.util.List;
  */
 public class BlockPortalFrame extends Block
 {
+	private static final SingleThreadedRandomSource RANDOM = new SingleThreadedRandomSource(Instant.now().toEpochMilli());
+
 	public BlockPortalFrame(ResourceKey<Block> id)
 	{
 		super(Block.Properties.of()
@@ -56,7 +61,14 @@ public class BlockPortalFrame extends Block
 				}
 				else if (!SimplePortals.portalRegistry.isPortalAt(pos, playerLevel.dimension()))
 				{
-					return (SimplePortals.portalRegistry.activatePortal((ServerLevel)world, pos, hit.getDirection())) ? InteractionResult.SUCCESS_SERVER : InteractionResult.PASS;
+					if (SimplePortals.portalRegistry.activatePortal((ServerLevel)world, pos, hit.getDirection()))
+					{
+						// TODO: Make sound configurable, check if randomness is needed in volume and pitch
+						world.playSound(null, pos, SoundEvents.END_PORTAL_SPAWN, SoundSource.BLOCKS, 10.0f, 1.0f);
+						return InteractionResult.SUCCESS_SERVER;
+					}
+
+					return InteractionResult.PASS;
 				}
 
 				return InteractionResult.PASS;

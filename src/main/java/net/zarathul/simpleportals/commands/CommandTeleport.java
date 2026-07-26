@@ -9,12 +9,10 @@ import net.minecraft.commands.arguments.DimensionArgument;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.Permissions;
-import net.zarathul.simpleportals.common.Utils;
 
 import java.util.Set;
 
@@ -84,15 +82,14 @@ public class CommandTeleport
 				break;
 		}
 
-//		Utils.teleportTo(player, dimension.dimension(), destination, Direction.NORTH);
 		player.teleportTo(
 			source.getServer().getLevel(dimension.dimension()),
 			destination.getX(),
 			destination.getY(),
 			destination.getZ(),
 			Set.of(),
-			player.getXRot(),
 			player.getYRot(),
+			player.getXRot(),
 			false
 		);
 		SendTranslatedMessage(source, "commands.tpd.success", player.getName(), destination.getX(), destination.getY(), destination.getZ(), dimension.dimension().identifier());

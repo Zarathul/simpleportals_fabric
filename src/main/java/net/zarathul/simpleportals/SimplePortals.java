@@ -7,7 +7,6 @@ import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLevelEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -17,14 +16,13 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.locale.Language;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.InteractionResult;
@@ -42,7 +40,6 @@ import net.zarathul.simpleportals.commands.CommandPortals;
 import net.zarathul.simpleportals.commands.CommandTeleport;
 import net.zarathul.simpleportals.commands.ConfigCommandMode;
 import net.zarathul.simpleportals.commands.arguments.BlockArgument;
-import net.zarathul.simpleportals.common.TeleportTask;
 import net.zarathul.simpleportals.common.Utils;
 import net.zarathul.simpleportals.configuration.Config;
 import net.zarathul.simpleportals.configuration.ConfigValue;
@@ -50,6 +47,7 @@ import net.zarathul.simpleportals.configuration.gui.PortalInfo;
 import net.zarathul.simpleportals.items.ItemPortalActivator;
 import net.zarathul.simpleportals.items.ItemPortalFrame;
 import net.zarathul.simpleportals.items.ItemPowerGauge;
+import net.zarathul.simpleportals.registration.Portal;
 import net.zarathul.simpleportals.registration.PortalRegistry;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -59,7 +57,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 
 public class SimplePortals implements ModInitializer
@@ -96,7 +93,6 @@ public class SimplePortals implements ModInitializer
 
 	// portal registry
 	public static PortalRegistry portalRegistry;
-	public static LinkedBlockingQueue<TeleportTask> TELEPORT_QUEUE = new LinkedBlockingQueue<>();
 
 	@Override
 	public void onInitialize()
@@ -120,7 +116,6 @@ public class SimplePortals implements ModInitializer
 
 		// Register creative tab.
 		Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, CREATIVE_MODE_TAB_ID, creativeTab);
-//		Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, Utils.createModIdentifier("creative_tab"), creativeTab);
 
 		// Register custom network payloads.
 		PayloadTypeRegistry.serverboundPlay().register(ListCommandPayload.TYPE, ListCommandPayload.CODEC);
@@ -158,57 +153,6 @@ public class SimplePortals implements ModInitializer
 						})
 					)
 				);
-			}
-		});
-
-		// Handle teleportation queue in server tick event.
-		ServerTickEvents.END_SERVER_TICK.register((server) -> {
-			TeleportTask task;
-			MinecraftServer mcServer = null;
-
-			while (true)
-			{
-				task = SimplePortals.TELEPORT_QUEUE.peek();
-				if (task == null) return;
-
-				try (var level = task.player.level())
-				{
-					mcServer = level.getServer();
-				}
-				catch (Exception _) {}
-
-				if (mcServer == null)
-				{
-					// No point in keeping the task if there's no server. Should never happen but who knows.
-					TELEPORT_QUEUE.poll();
-				}
-				else if (mcServer != server)
-				{
-					// Wrong server. No idea if this even can happen but let's be sure.
-					return;
-				}
-				else if (mcServer.getTickCount() > (task.creationTickCount + Settings.playerTeleportationDelay))
-				{
-					// Task is due.
-					TELEPORT_QUEUE.poll();
-//					Utils.teleportTo(task.player, task.dimension, task.pos, task.facing);
-
-					task.player.teleportTo(
-						mcServer.getLevel(task.dimension),
-						task.pos.getX(),
-						task.pos.getY(),
-						task.pos.getZ(),
-						Set.of(),
-						task.player.getXRot(),
-						task.player.getYRot(),
-						false
-					);
-				}
-				else
-				{
-					// Task was not due yet, so if there are others they won't be either.
-					return;
-				}
 			}
 		});
 
@@ -307,28 +251,55 @@ public class SimplePortals implements ModInitializer
 			ServerPlayNetworking.send(player, outgoingPayload);
 		});
 
-		// Server side receiver for the tpd command. Responsible for actually teleporting the client around. This is currently used only from a button in the portal list.
+		// Server side receiver for clicking on the teleport to portal button in the ListCommandGui.
+		// Responsible for actually teleporting the client around.
 		ServerPlayNetworking.registerGlobalReceiver(TpdCommandPayload.TYPE, (payload, ctx) -> {
 			var player = ctx.player();
 
 			if (!player.permissions().hasPermission(Permissions.COMMANDS_OWNER))
 			{
-				ctx.player().sendSystemMessage(Component.translatable("missing_permission"));
+				player.sendSystemMessage(Component.translatable("missing_permission"));
 				return;
 			}
 
-			ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, payload.dimension);	// dimension
-			BlockPos location = payload.location;														// location
-//			Utils.teleportTo(player, dimension, location, Direction.NORTH);
+			ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, payload.dimension);
+			BlockPos location = payload.location;
+			ServerLevel destinationLevel = ctx.server().getLevel(dimension);
+
+			if (destinationLevel == null)
+			{
+				// TODO: Add I18N
+				player.sendSystemMessage(Component.translatable("dimension_missing"));
+				return;
+			}
+
+			List<Portal> portals = portalRegistry.getPortalsAt(location, dimension);
+
+			if (portals.isEmpty())
+			{
+				// TODO: Add I18N
+				player.sendSystemMessage(Component.translatable("portal_missing"));
+				return;
+			}
+
+			Portal destinationPortal = portals.getFirst();
+			PortalRegistry.TeleportationDestination destination = PortalRegistry.getTeleportDestination(destinationPortal, destinationLevel, player);
+
+			if (destination == null)
+			{
+				// TODO: Add I18N
+				player.sendSystemMessage(Component.translatable("portal_blocked"));
+				return;
+			}
 
 			player.teleportTo(
-				ctx.server().getLevel(dimension),
-				location.getY(),
-				location.getZ(),
-				location.getX(),
+				destinationLevel,
+				destination.pos().getX() + 0.5d,
+				destination.pos().getY(),
+				destination.pos().getZ() + 0.5d,
 				Set.of(),
-				player.getXRot(),
-				player.getYRot(),
+				destination.facing().toYRot(),
+				player.xRotO,
 				false
 			);
 		});

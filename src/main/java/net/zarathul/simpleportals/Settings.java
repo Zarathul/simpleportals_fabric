@@ -45,7 +45,7 @@ public final class Settings
 	public static final int playerTeleportationCooldownDefault = 60;
 	public static boolean playerTeleportationCooldownValidator(int value)
 	{
-		return (value >= 60);
+		return (value >= 0);
 	}
 
 	@ConfigSetting(descriptionKey = "power_source", description = "The tag that items must have to be able to power portals (1 power per item).", category = "common", permissionLvl = 4)
@@ -93,4 +93,8 @@ public final class Settings
 	@ConfigSetting(descriptionKey = "teleportation_sound_enabled", description = "If enabled, a sound effect is played to the player after a successful teleportation.", category = "client", clientOnly = true)
 	public static boolean teleportationSoundEnabled;
 	public static final boolean teleportationSoundEnabledDefault = true;
+
+	@ConfigSetting(descriptionKey = "teleportation_effect_enabled", description = "If enabled, the same effect, as if using a nether portal, is show to the player before teleportation.", category = "client", clientOnly = true)
+	public static boolean teleportationTransitionEffectEnabled;
+	public static final boolean teleportationTransitionEffectEnabledDefault = true;
 }
