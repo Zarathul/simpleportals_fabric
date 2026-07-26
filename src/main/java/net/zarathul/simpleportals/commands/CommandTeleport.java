@@ -13,6 +13,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.Permissions;
+import net.zarathul.simpleportals.common.Utils;
 
 import java.util.Set;
 
@@ -29,7 +30,7 @@ public class CommandTeleport
 		dispatcher.register(
 			Commands.literal("tpd").requires((commandSource) -> commandSource.permissions().hasPermission(Permissions.COMMANDS_OWNER))
 			.executes(context -> {
-				SendTranslatedMessage(context.getSource(), "commands.tpd.info");
+				Utils.SendTranslatedMessage(context.getSource(), "commands.tpd.info");
 				return 1;
 			})
 			.then(
@@ -92,13 +93,8 @@ public class CommandTeleport
 			player.getXRot(),
 			false
 		);
-		SendTranslatedMessage(source, "commands.tpd.success", player.getName(), destination.getX(), destination.getY(), destination.getZ(), dimension.dimension().identifier());
+		Utils.SendTranslatedMessage(source, "commands.tpd.success", player.getName(), destination.getX(), destination.getY(), destination.getZ(), dimension.dimension().identifier());
 
 		return 1;
-	}
-
-	private static void SendTranslatedMessage(CommandSourceStack source, String message, Object... args)
-	{
-		source.sendSuccess(() -> Component.translatable(message, args), false);
 	}
 }

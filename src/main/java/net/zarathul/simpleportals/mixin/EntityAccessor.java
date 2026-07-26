@@ -10,13 +10,4 @@ public interface EntityAccessor
 {
 	@Accessor("portalCooldown")
 	int getPortalCooldown();
-
-	@Accessor("portalCooldown")
-	void setPortalCooldown(int ticks);
-
-	@Invoker("removeAfterChangingDimensions")
-	void invokeRemoveAfterChangingDimensions();
-
-	@Invoker("unsetRemoved")
-	void invokeUnsetRemoved();
 }
