@@ -1,39 +1,19 @@
 package net.zarathul.simpleportals.common;
 
-import com.google.common.primitives.Ints;
-import com.mojang.authlib.minecraft.client.MinecraftClient;
-import net.minecraft.client.Minecraft;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.protocol.game.*;
 import net.minecraft.resources.Identifier;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.level.TicketType;
-import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.server.players.PlayerList;
 import net.minecraft.util.Mth;
-import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.biome.BiomeManager;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.LevelData;
-import net.minecraft.world.phys.Vec3;
-import net.zarathul.simpleportals.Settings;
 import net.zarathul.simpleportals.SimplePortals;
-import net.zarathul.simpleportals.mixin.EntityAccessor;
-import net.zarathul.simpleportals.mixin.ServerPlayerAccessor;
 
 import java.util.ArrayList;
-import java.util.Optional;
 
 /**
  * General utility class.
@@ -41,19 +21,19 @@ import java.util.Optional;
 public final class Utils
 {
 	/**
-	 * Gets the localized formatted string for the specified key.
+	 * Gets the localized formatted literal {@link Component} for the specified key.
 	 *
 	 * @param key
 	 * The key for the localized string.
 	 * @param parameters
 	 * Formatting arguments.
 	 * @return
-	 * The localized formatted string.
+	 * The localized formatted {@link Component}.
 	 */
-	public static String translate(String key, Object... parameters)
+	public static Component translate(String key, Object... parameters)
 	{
 		Language I18N = Language.getInstance();
-		return String.format(I18N.getOrDefault(key), parameters);
+		return Component.literal(String.format(I18N.getOrDefault(key), parameters));
 	}
 
 	/**
@@ -148,161 +128,6 @@ public final class Utils
 	}
 
 	/**
-	 * Teleport an entity to the specified position in the specified dimensionId
-	 * facing the specified direction.
-	 *
-	 * @param entity
-	 * The entity to teleport. Can be any entity (item, mob, player).
-	 * @param dimension
-	 * The dimension to port to.
-	 * @param destination
-	 * The position to port to.
-	 * @param facing
-	 * The direction the entity should face after porting.
-	 * @return
-	 * The entity after the teleportation process. For non-player entities, if the teleportation was successful,
-	 * this will be a different entity than the one passed in. This is the case, because the entity needs to be
-	 * recreated in the destination dimension.
-	 */
-//	public static Entity teleportTo(Entity entity, ResourceKey<Level> dimension, BlockPos destination, Direction facing)
-//	{
-//		if (entity == null || dimension == null || destination == null || !entity.canChangeDimensions() || entity.isVehicle() || entity.isPassenger()) return entity;
-//
-//		ServerPlayer player = (entity instanceof ServerPlayer) ? (ServerPlayer) entity : null;
-//		boolean interdimensional = (entity.getCommandSenderWorld().dimension() != dimension);
-//		entity.setDeltaMovement(Vec3.ZERO);
-//
-//		if (player != null)
-//		{
-//			if (interdimensional)
-//			{
-//				teleportPlayerToDimension(player, dimension, destination, getYaw(facing), 0.0f);
-//			}
-//			else
-//			{
-//				ChunkPos chunkPos = new ChunkPos(destination);
-//				((ServerLevel)entity.level).getChunkSource().addRegionTicket(TicketType.POST_TELEPORT, chunkPos, 1, entity.getId());
-//				((ServerPlayer)entity).connection.teleport(destination.getX() + 0.5d, destination.getY(), destination.getZ() + 0.5d, getYaw(facing), 0.0f);
-//			}
-//
-//			// Play teleportation sound.
-//			if (Settings.teleportationSoundEnabled) player.connection.send(new ClientboundLevelEventPacket(1032, BlockPos.ZERO, 0, false));
-//		}
-//		else
-//		{
-//			if (interdimensional)
-//			{
-//				return teleportNonPlayerEntityToDimension(entity, dimension, destination, getYaw(facing));
-//			}
-//			else
-//			{
-//				entity.moveTo(destination.getX() + 0.5d,
-//							  destination.getY(),
-//							  destination.getZ() + 0.5d,
-//							  getYaw(facing),
-//							  0.0f);
-//			}
-//		}
-//
-//		return entity;
-//	}
-
-	/**
-	 * Generic version of {@link ServerPlayer#changeDimension(ServerLevel)} without the hardcoded stuff.
-	 */
-//	private static void teleportPlayerToDimension(ServerPlayer player, ResourceKey<Level> dimensionKey, BlockPos destination, float yaw, float pitch)
-//	{
-//		// Setting this flag circumvents at least a part of the shitty speed hack checks in
-//		// 'ServerGamePacketListenerImpl.handleMovePlayer()' that cause nothing but trouble.
-//		((ServerPlayerAccessor)player).setIsChangingDimension(true);
-//
-//		MinecraftServer server = player.getServer();
-//		if (server == null) return;
-//
-//		ServerLevel destinationDimension = server.getLevel(dimensionKey);
-//		if (destinationDimension == null) return;
-//
-//		ServerLevel originDimension = player.getLevel();
-//		LevelData levelData = destinationDimension.getLevelData();
-//
-//		player.connection.send(new ClientboundRespawnPacket(destinationDimension.dimensionTypeId(), destinationDimension.dimension(), BiomeManager.obfuscateSeed(destinationDimension.getSeed()), player.gameMode.getGameModeForPlayer(), player.gameMode.getPreviousGameModeForPlayer(), destinationDimension.isDebug(), destinationDimension.isFlat(), true, player.getLastDeathLocation()));
-//		player.connection.send(new ClientboundChangeDifficultyPacket(levelData.getDifficulty(), levelData.isDifficultyLocked()));
-//
-//		PlayerList playerList = player.server.getPlayerList();
-//		playerList.sendPlayerPermissionLevel(player);
-//		originDimension.removePlayerImmediately(player, Entity.RemovalReason.CHANGED_DIMENSION);
-//		((EntityAccessor)player).invokeUnsetRemoved();
-//
-//		player.setLevel(destinationDimension);
-//		destinationDimension.addDuringPortalTeleport(player);
-//
-//		player.setYRot(yaw);
-//		player.setXRot(pitch);
-//		player.moveTo(destination.getX() + 0.5d, destination.getY(), destination.getZ() + 0.5d);
-//		player.setDeltaMovement(Vec3.ZERO);
-//
-//		player.connection.send(new ClientboundPlayerAbilitiesPacket(player.getAbilities()));
-//		playerList.sendLevelInfo(player, destinationDimension);
-//		playerList.sendAllPlayerInfo(player);
-//
-//		for (MobEffectInstance effect : player.getActiveEffects())
-//		{
-//			player.connection.send(new ClientboundUpdateMobEffectPacket(player.getId(), effect));
-//		}
-//
-//		player.connection.send(new ClientboundLevelEventPacket(1032, BlockPos.ZERO, 0, false));
-//		player.giveExperienceLevels(0);	// This is just to set lastSentExp to -1
-//		player.resetSentInfo();	// Set lastSentHealth to -1.0F
-//		((ServerPlayerAccessor)player).setLastSendFood(-1);
-//	}
-
-	/**
-	 * Teleport a non-player entity to the specified position in the specified dimension
-	 * facing the specified direction.
-	 * ({@link Entity#changeDimension(ServerLevel)} without the hardcoded dimension specific vanilla code)
-	 *
-	 * @param entity
-	 * The entity to teleport. Can be any entity except players (e.g. item, mob).
-	 * @param dimensionKey
-	 * The dimension to port to.
-	 * @param destination
-	 * The position to port to.
-	 * @param yaw
-	 * The rotation yaw the entity should have after porting.
-	 * @return
-	 * The entity after the teleportation process. If the teleportation was successful, this will be a different entity
-	 * than the one passed in. This is the case, because the entity needs to be recreated in the destination dimension.
-	 */
-//	private static Entity teleportNonPlayerEntityToDimension(Entity entity, ResourceKey<Level> dimensionKey, BlockPos destination, float yaw)
-//	{
-//		if (!(entity.level instanceof ServerLevel) || entity.isRemoved()) return entity;
-//
-//		MinecraftServer server = entity.getServer();
-//		if (server == null)	return entity;
-//
-//		ServerLevel destinationWorld = server.getLevel(dimensionKey);
-//		if (destinationWorld == null) return entity;
-//
-//		entity.unRide();
-//		Entity newEntity = entity.getType().create(destinationWorld);
-//		if (newEntity == null) return entity;
-//
-//		newEntity.restoreFrom(entity);
-//		newEntity.moveTo(destination.getX(), destination.getY(), destination.getZ(), yaw, newEntity.getXRot());
-//		// This mixin might be overkill, since all this method does 99.9% of the time is setting Entity.removed
-//		// to true, but who knows what other peoples mods do. Better safe than sorry I guess.
-//		((EntityAccessor)entity).invokeRemoveAfterChangingDimensions();
-//		destinationWorld.addDuringTeleport(newEntity);
-//		newEntity.setDeltaMovement(Vec3.ZERO);
-//		newEntity.setOnGround(true);
-//
-//		((ServerLevel)entity.level).resetEmptyTime();
-//		destinationWorld.resetEmptyTime();
-//
-//		return newEntity;
-//	}
-
-	/**
 	 * Converts the specified facing to a degree value.
 	 *
 	 * @param facing
@@ -378,6 +203,28 @@ public final class Utils
 	public static int centerIn(int offset, int containerSize, int objectSize)
 	{
 		return offset + (containerSize - objectSize) / 2;
+	}
+
+	/**
+	 * Sends a localized message to the command source avoiding the issue with {@link Component#translatable(String, Object...)}
+	 * throwing exceptions if the <code>args</code> look like an {@link Identifier}. First tries to get the localized text for
+	 * the passed in <code>id</code>, then formats it using the passed in <code>args</code>.
+	 * Used for command feedback.
+	 *
+	 * @param source
+	 * The command source.
+	 * @param id
+	 * The localization {@link Identifier} as a string.
+	 * @param args
+	 * The arguments passed to {@link String#format(String, Object...)}.
+	 */
+	public static void SendTranslatedMessage(CommandSourceStack source, String id, Object... args)
+	{
+		// 'Component.translatable()' throws exceptions if something in 'args' looks like an identifier. So do the translation manually.
+
+		var I18N = Language.getInstance();
+		String translatedMessage = String.format(I18N.getOrDefault(id), args);
+		source.sendSuccess(() -> Component.literal(translatedMessage), false);
 	}
 
 	/**

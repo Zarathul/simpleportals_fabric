@@ -171,7 +171,7 @@ public class BlockPortal extends Block implements net.minecraft.world.level.bloc
 	@Override
 	public int getPortalTransitionTime(ServerLevel level, Entity entity)
 	{
-		return (entity instanceof Player) ? Settings.playerTeleportationCooldown : 0;
+		return (entity instanceof Player) ? Settings.playerTeleportationDelay : 0;
 	}
 
 	@Override
@@ -214,14 +214,14 @@ public class BlockPortal extends Block implements net.minecraft.world.level.bloc
 		{
 			TeleportTransition.PostTeleportTransition postTransition = TeleportTransition.PLACE_PORTAL_TICKET;
 			if (Settings.teleportationSoundEnabled) postTransition = postTransition.then(TeleportTransition.PLAY_PORTAL_SOUND);
-			Vec3 destinationVector = new Vec3(destination.pos().getX() + 0.5d, destination.pos().getY() + 0.5d, destination.pos().getZ() + 0.5d);
+			Vec3 destinationVector = new Vec3(destination.pos().getX() + 0.5d, destination.pos().getY(), destination.pos().getZ() + 0.5d);
 
 			return new TeleportTransition(destinationWorld, destinationVector, Vec3.ZERO, destination.facing().toYRot(), entity.xRotO, postTransition);
 		}
 		else
 		{
-			// TODO: Make sound configurable
-			currentLevel.playSound(null, portalEntryPos, SoundEvents.END_PORTAL_FRAME_FILL, SoundSource.BLOCKS);
+			if (Settings.notEnoughPowerSoundEnabled) currentLevel.playSound(null, portalEntryPos, SoundEvents.END_PORTAL_FRAME_FILL, SoundSource.BLOCKS);
+
 			return null;
 		}
 	}
@@ -229,7 +229,7 @@ public class BlockPortal extends Block implements net.minecraft.world.level.bloc
 	@Override
 	public Transition getLocalTransition()
 	{
-		return (Settings.teleportationTransitionEffectEnabled) ? Transition.CONFUSION : Transition.NONE;
+		return (Settings.transitionEffectEnabled) ? Transition.CONFUSION : Transition.NONE;
 	}
 
 	private boolean handlePowerSourceEnteringPortal(Level world, BlockPos pos, Entity entity)

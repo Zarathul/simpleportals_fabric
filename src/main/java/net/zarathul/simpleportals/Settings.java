@@ -8,7 +8,7 @@ import net.zarathul.simpleportals.configuration.ConfigSetting;
 
 public final class Settings
 {
-	@ConfigSetting(descriptionKey = "max_size", description = "The maximum size of the portal including the frame.", category = "common", permissionLvl = 4)
+	@ConfigSetting(descriptionKey = "max_size", description = "The maximum size of the portal including the frame.", category = "server", permissionLvl = 4)
 	public static int maxSize;
 	public static final int maxSizeDefault = 7;
 	public static boolean maxSizeValidator(int value)
@@ -16,7 +16,7 @@ public final class Settings
 		return ((value >= 3) && (value <= 128));
 	}
 
-	@ConfigSetting(descriptionKey = "power_cost", description = "The power cost per use of a portal. Set to 0 for no cost.", category = "common", permissionLvl = 4)
+	@ConfigSetting(descriptionKey = "power_cost", description = "The power cost per use of a portal. Set to 0 for no cost.", category = "server", permissionLvl = 4)
 	public static int powerCost;
 	public static final int powerCostDefault = 1;
 	public static boolean powerCostValidator(int value)
@@ -24,7 +24,7 @@ public final class Settings
 		return (value >= 0 && value <= powerCapacity);
 	}
 
-	@ConfigSetting(descriptionKey = "power_capacity", description = "The amount of power a portal can store.", category = "common", permissionLvl = 4)
+	@ConfigSetting(descriptionKey = "power_capacity", description = "The amount of power a portal can store.", category = "server", permissionLvl = 4)
 	public static int powerCapacity;
 	public static final int powerCapacityDefault = 64;
 	public static boolean powerCapacityValidator(int value)
@@ -32,23 +32,12 @@ public final class Settings
 		return (value > 0 && value >= powerCost);
 	}
 
-	@ConfigSetting(descriptionKey = "player_teleportation_delay", description = "The delay in ticks before a player actually gets teleported. Needs to be lower than the cooldown.", category = "common", permissionLvl = 4)
+	@ConfigSetting(descriptionKey = "player_teleportation_delay", description = "The delay in ticks before a player actually gets teleported.", category = "server", permissionLvl = 4)
 	public static int playerTeleportationDelay;
-	public static final int playerTeleportationDelayDefault = 10;
-	public static boolean playerTeleportationDelayValidator(int value)
-	{
-		return ((value >= 0) && (value <= 40));
-	}
+	public static final int playerTeleportationDelayDefault = 30;
+	public static boolean playerTeleportationDelayValidator(int value) { return value >= 0;	}
 
-	@ConfigSetting(descriptionKey = "player_teleportation_cooldown", description = "Cooldown in ticks before a player can be teleported again by a portal.", category = "common", permissionLvl = 4)
-	public static int playerTeleportationCooldown;
-	public static final int playerTeleportationCooldownDefault = 60;
-	public static boolean playerTeleportationCooldownValidator(int value)
-	{
-		return (value >= 0);
-	}
-
-	@ConfigSetting(descriptionKey = "power_source", description = "The tag that items must have to be able to power portals (1 power per item).", category = "common", permissionLvl = 4)
+	@ConfigSetting(descriptionKey = "power_source", description = "The tag that items must have to be able to power portals (1 power per item).", category = "server", permissionLvl = 4)
 	public static Identifier powerSource;
 	public static final Identifier powerSourceDefault = Identifier.parse("c:ender_pearls");
 	public static Identifier powerSourceLoad(String value)
@@ -61,14 +50,8 @@ public final class Settings
 	}
 	public static boolean powerSourceValidator(Identifier sourceId)
 	{
-		// When the config file is first loaded, data-packs (including tags) are not loaded yet.
-		// Without the tag list there is no way to check if a ResourceLocation is valid, so accept them all.
-		// Without doing this, a value for powerSource could never be loaded from the config file, because
-		// it would always be invalid.
-		if (BuiltInRegistries.ITEM.getTags().findAny().isEmpty()) return true;
-
 		// Check if the passed ResourceLocation corresponds to a valid tag and cache the result for later use.
-		// Note: Registry.ITEM.getTag() doesn't find anything with a new'd TagKey as an argument, that's why
+		// Note: BuiltInRegistries.ITEM.getTag() doesn't find anything with a new'd TagKey as an argument, that's why
 		// the registry is searched manually here.
 		var searchResult = BuiltInRegistries.ITEM.getTags().filter(namedItem -> namedItem.key().location().equals(sourceId)).findAny();
 
@@ -82,6 +65,20 @@ public final class Settings
 	}
 	public static TagKey<Item> powerSourceTag;
 
+	@ConfigSetting(descriptionKey = "teleportation_sound_enabled", description = "If enabled, successful teleportation of a player, plays a sound effect.", category = "server")
+	public static boolean teleportationSoundEnabled;
+	public static final boolean teleportationSoundEnabledDefault = true;
+
+	@ConfigSetting(descriptionKey = "portal_activation_sound_enabled", description = "If enabled, successful portal activation plays a sound effect.", category = "server")
+	public static boolean portalActivationSoundEnabled;
+	public static final boolean portalActivationSoundEnabledDefault = true;
+
+	@ConfigSetting(descriptionKey = "not_enough_power_sound_enabled", description = "If enabled, trying to use a portal without enough power plays a sound effect signifying failure.", category = "server")
+	public static boolean notEnoughPowerSoundEnabled;
+	public static final boolean notEnoughPowerSoundEnabledDefault = true;
+
+	// Client-only
+
 	@ConfigSetting(descriptionKey = "particles_enabled", description = "If enabled, portals emit particles (visual effect).", category = "client", clientOnly = true)
 	public static boolean particlesEnabled;
 	public static final boolean particlesEnabledDefault = true;
@@ -90,11 +87,7 @@ public final class Settings
 	public static boolean ambientSoundEnabled;
 	public static final boolean ambientSoundEnabledDefault = false;
 
-	@ConfigSetting(descriptionKey = "teleportation_sound_enabled", description = "If enabled, a sound effect is played to the player after a successful teleportation.", category = "client", clientOnly = true)
-	public static boolean teleportationSoundEnabled;
-	public static final boolean teleportationSoundEnabledDefault = true;
-
-	@ConfigSetting(descriptionKey = "teleportation_effect_enabled", description = "If enabled, the same effect, as if using a nether portal, is show to the player before teleportation.", category = "client", clientOnly = true)
-	public static boolean teleportationTransitionEffectEnabled;
-	public static final boolean teleportationTransitionEffectEnabledDefault = true;
+	@ConfigSetting(descriptionKey = "transition_effect_enabled", description = "If enabled, players get the same visual effect as if traveling through a Nether portal.", category = "client", clientOnly = true)
+	public static boolean transitionEffectEnabled;
+	public static final boolean transitionEffectEnabledDefault = true;
 }

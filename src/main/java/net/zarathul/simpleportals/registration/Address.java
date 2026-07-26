@@ -189,7 +189,7 @@ public class Address
 	 * Generates a readable representation of the address.
 	 * 
 	 * The format is <code>blockIdxblockCount</code> for every
-	 * block id, delimited by "<code>,</code>".
+	 * block id, delimited by <code>,</code>.
 	 */
 	private void generateReadableName()
 	{

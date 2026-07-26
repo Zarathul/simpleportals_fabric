@@ -16,6 +16,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.locale.Language;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.StreamCodec;
@@ -100,9 +101,6 @@ public class SimplePortals implements ModInitializer
 		// Register custom block argument type for command parser.
 		ArgumentTypeRegistry.registerArgumentType(Identifier.fromNamespaceAndPath(MOD_ID, "block_argument"), BlockArgument.class, SingletonArgumentInfo.contextFree(BlockArgument::block));
 
-		// Load or create config file.
-		Config.loadOrCreate(MOD_ID, Settings.class);
-
 		// Register Blocks & Items.
 		Registry.register(BuiltInRegistries.BLOCK, Utils.createModIdentifier(BLOCK_PORTAL_NAME), blockPortal);
 
@@ -174,8 +172,9 @@ public class SimplePortals implements ModInitializer
 		});
 
 		ServerLifecycleEvents.SERVER_STARTED.register((server) -> {
-			// The validator already does the caching so just use that.
-			Settings.powerSourceValidator(Settings.powerSource);
+			// Load or create config file. Doing this at the start of onInitialize() would be preferable, but that leads to Settings.powerSourceValidator() failing.
+			// This happens because registries are not fully set up at that time, which the validator queries.
+			Config.loadOrCreate(MOD_ID, Settings.class);
 		});
 
 		// Necessary for dismantling blocks with the portal activator on sneak right-click.
@@ -255,6 +254,7 @@ public class SimplePortals implements ModInitializer
 		// Responsible for actually teleporting the client around.
 		ServerPlayNetworking.registerGlobalReceiver(TpdCommandPayload.TYPE, (payload, ctx) -> {
 			var player = ctx.player();
+			var I18N = Language.getInstance();
 
 			if (!player.permissions().hasPermission(Permissions.COMMANDS_OWNER))
 			{
@@ -268,8 +268,8 @@ public class SimplePortals implements ModInitializer
 
 			if (destinationLevel == null)
 			{
-				// TODO: Add I18N
-				player.sendSystemMessage(Component.translatable("dimension_missing"));
+				var localizedMessage = String.format(I18N.getOrDefault("dimension_missing"), dimension.identifier());
+				player.sendSystemMessage(Component.literal(localizedMessage));
 				return;
 			}
 
@@ -277,8 +277,8 @@ public class SimplePortals implements ModInitializer
 
 			if (portals.isEmpty())
 			{
-				// TODO: Add I18N
-				player.sendSystemMessage(Component.translatable("portal_missing"));
+				var localizedMessage = String.format(I18N.getOrDefault("portal_missing"), dimension.identifier(), location);
+				player.sendSystemMessage(Component.literal(localizedMessage));
 				return;
 			}
 
@@ -287,8 +287,8 @@ public class SimplePortals implements ModInitializer
 
 			if (destination == null)
 			{
-				// TODO: Add I18N
-				player.sendSystemMessage(Component.translatable("portal_blocked"));
+				var localizedMessage = String.format(I18N.getOrDefault("portal_blocked"), destinationPortal.asReadableString());
+				player.sendSystemMessage(Component.literal(localizedMessage));
 				return;
 			}
 

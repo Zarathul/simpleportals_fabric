@@ -19,6 +19,7 @@ import net.minecraft.world.level.levelgen.SingleThreadedRandomSource;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.redstone.Orientation;
 import net.minecraft.world.phys.BlockHitResult;
+import net.zarathul.simpleportals.Settings;
 import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.registration.Portal;
 import org.jspecify.annotations.Nullable;
@@ -63,8 +64,8 @@ public class BlockPortalFrame extends Block
 				{
 					if (SimplePortals.portalRegistry.activatePortal((ServerLevel)world, pos, hit.getDirection()))
 					{
-						// TODO: Make sound configurable, check if randomness is needed in volume and pitch
-						world.playSound(null, pos, SoundEvents.END_PORTAL_SPAWN, SoundSource.BLOCKS, 10.0f, 1.0f);
+						if (Settings.portalActivationSoundEnabled) world.playSound(null, pos, SoundEvents.END_PORTAL_SPAWN, SoundSource.BLOCKS, 0.5f, 1.0f);
+
 						return InteractionResult.SUCCESS_SERVER;
 					}
 

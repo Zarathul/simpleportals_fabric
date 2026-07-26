@@ -167,4 +167,15 @@ public record Portal(ResourceKey<Level> dimension, Address address, Axis axis,
 		
 		return hasAddressChanged(world);
 	}
+
+	/**
+	 * Gets a more readable string representation of a portal that does not contain all the information, which would be very lengthy.
+	 *
+	 * @return
+	 * A string containing only the portal position, dimension and address.
+	 */
+	public String asReadableString()
+	{
+		return String.format("%s / %s / %s", Utils.getReadableBlockPos(corner1.pos()), dimension.identifier(), address.toString());
+	}
 }
