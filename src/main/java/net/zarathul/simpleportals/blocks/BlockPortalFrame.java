@@ -64,7 +64,7 @@ public class BlockPortalFrame extends Block
 				{
 					if (SimplePortals.portalRegistry.activatePortal((ServerLevel)world, pos, hit.getDirection()))
 					{
-						if (Settings.portalActivationSoundEnabled) world.playSound(null, pos, SoundEvents.END_PORTAL_SPAWN, SoundSource.BLOCKS, 0.5f, 1.0f);
+						if (Settings.portalActivationSoundEnabled()) world.playSound(null, pos, SoundEvents.END_PORTAL_SPAWN, SoundSource.BLOCKS, 0.5f, 1.0f);
 
 						return InteractionResult.SUCCESS_SERVER;
 					}

@@ -1,7 +1,6 @@
 package net.zarathul.simpleportals;
 
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.command.v2.ArgumentTypeRegistry;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab;
@@ -10,7 +9,6 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.commands.Commands;
 import net.minecraft.commands.synchronization.SingletonArgumentInfo;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
@@ -43,7 +41,6 @@ import net.zarathul.simpleportals.commands.ConfigCommandMode;
 import net.zarathul.simpleportals.commands.arguments.BlockArgument;
 import net.zarathul.simpleportals.common.Utils;
 import net.zarathul.simpleportals.configuration.Config;
-import net.zarathul.simpleportals.configuration.ConfigValue;
 import net.zarathul.simpleportals.configuration.gui.PortalInfo;
 import net.zarathul.simpleportals.items.ItemPortalActivator;
 import net.zarathul.simpleportals.items.ItemPortalFrame;
@@ -55,7 +52,6 @@ import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -126,32 +122,6 @@ public class SimplePortals implements ModInitializer
 		CommandRegistrationCallback.EVENT.register((dispatcher, registry, environment) -> {
 			CommandPortals.register(dispatcher);
 			CommandTeleport.register(dispatcher);
-
-			if (environment.includeIntegrated)
-			{
-				dispatcher.register(
-					Commands.literal("sportals")
-					.then(
-						Commands.literal("config")	// sportals config
-						.executes(context -> {
-							var payload = new ConfigCommandPayload(ConfigCommandMode.GetServerSettings, Collections.emptyList());
-							ClientPlayNetworking.send(payload);
-
-							return 1;
-						})
-					)
-					.then(
-						Commands.literal("list")
-						.requires(commandSource -> commandSource.permissions().hasPermission(Permissions.COMMANDS_OWNER))
-						.executes(context -> {
-							var payload = new ListCommandPayload(Collections.emptyList());
-							ClientPlayNetworking.send(payload);
-
-							return 1;
-						})
-					)
-				);
-			}
 		});
 
 		// Load portal registry data on overworld load.
@@ -168,13 +138,15 @@ public class SimplePortals implements ModInitializer
 
 		ServerLifecycleEvents.END_DATA_PACK_RELOAD.register((server, serverResources, success) -> {
 			// The validator already does the caching so just use that.
-			Settings.powerSourceValidator(Settings.powerSource);
+			Settings.powerSourceIsValid(Settings.powerSource());
 		});
 
 		ServerLifecycleEvents.SERVER_STARTED.register((server) -> {
-			// Load or create config file. Doing this at the start of onInitialize() would be preferable, but that leads to Settings.powerSourceValidator() failing.
+			// Load or create config file. Doing this at the start of onInitialize() would be preferable, but that leads to the validator of Settings.powerSource() failing.
 			// This happens because registries are not fully set up at that time, which the validator queries.
-			Config.loadOrCreate(MOD_ID, Settings.class);
+			Config.reset();
+			Settings.init();
+			Config.loadOrCreateConfigFile(MOD_ID);
 		});
 
 		// Necessary for dismantling blocks with the portal activator on sneak right-click.
@@ -205,22 +177,16 @@ public class SimplePortals implements ModInitializer
 			{
 				case GetServerSettings ->
 				{
-					List<ConfigValue> configValues = new ArrayList<>();
-					Config.writeServerSettings(Settings.class, configValues, player);
+					List<Config.ConfigValue> configValues = new ArrayList<>();
+					Config.writeServerSettings(configValues, player);
 					ConfigCommandPayload outgoingPayload = new ConfigCommandPayload(ConfigCommandMode.GetServerSettings, configValues);
 
 					ServerPlayNetworking.send(player, outgoingPayload);
 				}
 				case SetServerSettings ->
 				{
-					if (!player.permissions().hasPermission(Permissions.COMMANDS_OWNER))
-					{
-						player.sendSystemMessage(Component.translatable("missing_permission"));
-						return;
-					}
-
-					Config.readServerSettings(Settings.class, payload.values, player);
-					Config.save(MOD_ID, Settings.class);
+					Config.readServerSettings(payload.values, player);
+					Config.save(MOD_ID);
 				}
 			}
 		});
@@ -344,7 +310,7 @@ public class SimplePortals implements ModInitializer
 		}
 	}
 
-	public record ConfigCommandPayload(ConfigCommandMode mode, List<ConfigValue> values) implements CustomPacketPayload
+	public record ConfigCommandPayload(ConfigCommandMode mode, List<Config.ConfigValue> values) implements CustomPacketPayload
 	{
 		public static final Identifier ID = Utils.createModIdentifier("config_command");
 		public static final CustomPacketPayload.Type<ConfigCommandPayload> TYPE = new CustomPacketPayload.Type<>(ID);

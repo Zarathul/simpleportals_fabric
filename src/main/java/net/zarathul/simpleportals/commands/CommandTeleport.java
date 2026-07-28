@@ -93,7 +93,7 @@ public class CommandTeleport
 			player.getXRot(),
 			false
 		);
-		Utils.SendTranslatedMessage(source, "commands.tpd.success", player.getName(), destination.getX(), destination.getY(), destination.getZ(), dimension.dimension().identifier());
+		Utils.SendTranslatedMessage(source, "commands.tpd.success", player.getName().getString(), destination.getX(), destination.getY(), destination.getZ(), dimension.dimension().identifier());
 
 		return 1;
 	}

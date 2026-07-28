@@ -4,6 +4,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.DimensionArgument;
@@ -26,6 +27,7 @@ import net.zarathul.simpleportals.registration.Address;
 import net.zarathul.simpleportals.registration.Portal;
 import net.zarathul.simpleportals.registration.PortalRegistry;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -49,26 +51,24 @@ public class CommandPortals
 
 	public static void register(CommandDispatcher<CommandSourceStack> dispatcher)
 	{
-		// As of 1.18.2 because the config and list subcommands are client-side only, the whole command tree has to be mirrored in ClientInit.
-		// As of 1.19.2 this seems no longer necessary.
-		// TODO: Remove comment if no longer needed.
-
 		dispatcher.register(
-			Commands.literal("sportals").requires((commandSource) -> commandSource.permissions().hasPermission(Permissions.COMMANDS_OWNER))
+			Commands.literal("sportals")
 			.executes(context -> {
 				Utils.SendTranslatedMessage(context.getSource(), "commands.sportals.info");
 				return 1;
 			})
 			.then(
-				Commands.literal("config")	// Dummy so that the client side command shows up in auto-complete.
-				.executes(context -> 1)
+				Commands.literal("config")
+				.executes(context -> 1)	// Dummy so that the client side command shows up in auto-complete.
 			)
 			.then(
-				Commands.literal("list")		// Dummy so that the client side command shows up in auto-complete.
-				.executes(context -> 1)
+				Commands.literal("list")
+				.requires(commandSource -> commandSource.permissions().hasPermission(Permissions.COMMANDS_OWNER))
+				.executes(context -> 1)	// Dummy so that the client side command shows up in auto-complete.
 			)
 			.then(
 				Commands.literal("deactivate")
+				.requires((commandSource) -> commandSource.permissions().hasPermission(Permissions.COMMANDS_OWNER))
 				.executes(context -> {
 					Utils.SendTranslatedMessage(context.getSource(), "commands.sportals.deactivate.info");
 					return 1;
@@ -115,6 +115,7 @@ public class CommandPortals
 			)
 			.then(
 				Commands.literal("power")
+				.requires((commandSource) -> commandSource.permissions().hasPermission(Permissions.COMMANDS_OWNER))
 				.executes(context -> {
 					Utils.SendTranslatedMessage(context.getSource(), "commands.sportals.power.info");
 					return 1;
@@ -161,11 +162,11 @@ public class CommandPortals
 				.then(
 					Commands.literal("items")
 					.executes(context -> {
-						var powerTag = BuiltInRegistries.ITEM.get(Settings.powerSourceTag);
+						var powerTag = BuiltInRegistries.ITEM.get(Settings.powerSourceTag());
 
 						if (powerTag.isEmpty())
 						{
-							Utils.SendTranslatedMessage(context.getSource(), "commands.errors.no_power_items", Settings.powerSource.toString());
+							Utils.SendTranslatedMessage(context.getSource(), "commands.errors.no_power_items", Settings.powerSource().toString());
 							return 1;
 						}
 
@@ -181,6 +182,7 @@ public class CommandPortals
 			)
 			.then(
 				Commands.literal("cooldown")
+				.requires((commandSource) -> commandSource.permissions().hasPermission(Permissions.COMMANDS_OWNER))
 				.executes(context -> {
 					Utils.SendTranslatedMessage(context.getSource(), "commands.sportals.cooldown.info");
 					return 1;
@@ -192,6 +194,7 @@ public class CommandPortals
 			)
 			.then(
 				Commands.literal("clear")
+				.requires((commandSource) -> commandSource.permissions().hasPermission(Permissions.COMMANDS_OWNER))
 				.executes(context -> {
 					Utils.SendTranslatedMessage(context.getSource(), "commands.sportals.clear.info");
 					return 1;

@@ -62,14 +62,14 @@ public class BlockPowerGauge extends BlockPortalFrame
 	 */
 	private int getSignalStrength(Portal portal)
 	{
-		if (portal != null && Settings.powerCost > 0 && Settings.powerCapacity > 0)
+		if (portal != null && Settings.powerCost() > 0 && Settings.powerCapacity() > 0)
 		{
-			int maxUses = Mth.floor(Settings.powerCapacity / (float) Settings.powerCost);
+			int maxUses = Mth.floor(Settings.powerCapacity() / (float) Settings.powerCost());
 			
 			if (maxUses > 0)
 			{
 				int power = SimplePortals.portalRegistry.getPortalPower(portal);
-				int uses = Mth.floor(power / (float)Settings.powerCost);
+				int uses = Mth.floor(power / (float)Settings.powerCost());
 				
 				int signalStrength = Mth.floor((uses / (float)maxUses) * 14.0f) + ((uses > 0) ? 1 : 0);
 				

@@ -20,22 +20,18 @@ import net.minecraft.world.entity.player.Player;
 import net.zarathul.simpleportals.common.Utils;
 import net.zarathul.simpleportals.configuration.Config;
 import net.zarathul.simpleportals.configuration.ConfigSetting;
-import net.zarathul.simpleportals.configuration.StorageMethods;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Environment(EnvType.CLIENT)
 public class ConfigGui extends Screen
 {
-	private ModOptionList optionList;
-	private final Class<?> settingsType;
+	private SettingsList settingsList;
+	private List<ConfigSetting> settings;
 	private final String configName;
 	private final Player player;
 	private final Consumer<Player> syncChanges;
@@ -46,11 +42,11 @@ public class ConfigGui extends Screen
 	private static final int ENTRY_HEIGHT = 26;
 	private static final int FOOTER_HEIGHT = BUTTON_HEIGHT + 2 * PADDING;
 
-	public ConfigGui(Component title, Class<?> settingsType, String configName, Player player, Consumer<Player> syncChanges)
+	public ConfigGui(List<ConfigSetting> settings, Component title, String configName, Player player, Consumer<Player> syncChanges)
 	{
 		super(title);
 
-		this.settingsType = settingsType;
+		this.settings = settings;
 		this.configName = configName;
 		this.player = player;
 		this.syncChanges = syncChanges;
@@ -79,8 +75,8 @@ public class ConfigGui extends Screen
 
 	private void addContents()
 	{
-		optionList = new ModOptionList(settingsType, player, minecraft, width, 0, 0, ENTRY_HEIGHT);
-		layout.addToContents(optionList);
+		settingsList = new SettingsList(settings, player, minecraft, width, 0, 0, ENTRY_HEIGHT);
+		layout.addToContents(settingsList);
 	}
 
 	private void addFooter()
@@ -94,35 +90,35 @@ public class ConfigGui extends Screen
 
 	private void saveConfigAndCloseScreen()
 	{
-		optionList.commitChanges();
-		Config.save(configName, settingsType);
+		settingsList.commitChanges();
+		Config.save(configName);
 		if (syncChanges != null) syncChanges.accept(player);
 
-		minecraft.gui.setScreen(new ConfigGui(title, settingsType, configName, player, syncChanges));
+		minecraft.gui.setScreen(new ConfigGui(settings, title, configName, player, syncChanges));
 	}
 
 	@Override
 	protected void repositionElements()
 	{
 		layout.arrangeElements();
-		optionList.updateSize(width, layout);
+		settingsList.updateSize(width, layout);
 		layout.arrangeElements();
 	}
 
 	@Environment(EnvType.CLIENT)
-	public class ModOptionList extends ContainerObjectSelectionList<ModOptionList.Entry>
+	public class SettingsList extends ContainerObjectSelectionList<SettingsList.Entry>
 	{
 		private static final int LEFT_RIGHT_BORDER = 30;
 		private static final String I18N_PREFIX = "config.";
 		private static final String I18N_TOOLTIP_SUFFIX = ".tooltip";
-		private static final String I18N_VALID = "config.input_valid";
 		private static final String I18N_INVALID = "config.input_invalid";
 		private static final String I18N_NEEDS_WORLD_RESTART = "config.needs_world_restart";
+		private static final String I18N_RESET = "config.reset_to_default";
 
-		public ModOptionList(Class<?> settingsType, Player player, Minecraft mc, int width, int height, int top, int itemHeight)
+		public SettingsList(List<ConfigSetting> settings, Player player, Minecraft mc, int width, int height, int top, int itemHeight)
 		{
 			super(mc, width, height, top, itemHeight);
-			generateEntries(settingsType, player);
+			generateEntries(settings, player);
 		}
 
 		@Override
@@ -166,40 +162,61 @@ public class ConfigGui extends Screen
 			}
 		}
 
-		private void generateEntries(Class<?> clazz, Player player)
+		private void generateEntries(List<ConfigSetting> settings, Player player)
 		{
-			Field[] fields = Config.getSettingFieldsSortedByCategory(clazz);
-
-			ConfigSetting annotation;
-			String category;
 			String lastCategory = null;
-			var I18N = Language.getInstance();
+			settings.sort(getSettingComparator());
 
-			for (Field valueField : fields)
+			for (var setting : settings)
 			{
-				if (!Config.isValidSetting(valueField, true)) continue;
+				String category = setting.category;
 
-				annotation = valueField.getAnnotation(ConfigSetting.class);
-				category = ((annotation != null) && !annotation.category().isEmpty()) ? annotation.category() : Config.DEFAULT_CATEGORY;
-
-				if (!category.equals(lastCategory))
+				if (!category.isEmpty() && !category.equals(lastCategory))
 				{
-					String i18nKey = "config." + category;
-					// If the key is not found, the key itself is returned instead of the translated text.
-					String i18nText = I18N.getOrDefault(i18nKey);
-					String categoryLabel = (!i18nText.equals(i18nKey)) ? i18nText : category;
-
-					addEntry(new CategoryEntry(categoryLabel));
+					String localizedCategory = getLocalizedCategory(setting);
+					addEntry(new CategoryEntry(localizedCategory));
 
 					lastCategory = category;
 				}
 
-				addEntry(new OptionEntry(valueField, annotation, player));
+				addEntry(new SettingEntry(setting, player));
 			}
 		}
 
+		// Sorts by the localized category, then booleans first, enums second everything else after, and finally by localized description.
+		// This way every setting is under its category and in every category the checkboxes are at the top, followed by cyclebuttons and
+		// editboxes at the end.
+		private static Comparator<ConfigSetting> getSettingComparator()
+		{
+			return Comparator.<ConfigSetting, String>comparing(setting -> getLocalizedCategory((ConfigSetting)setting))
+				.thenComparing((o1, o2) -> {
+					if (o1.valueType == o2.valueType) return 0;
+					if (o1.isBoolean()) return -1;
+					if (o2.isBoolean()) return 1;
+					if (o1.isComplex() && o1.value instanceof Enum<?>) return -1;
+					return 1;
+				})
+				.thenComparing(SettingsList::getLocalizedDescription);
+		}
+
+		private static String getLocalizedCategory(ConfigSetting setting)
+		{
+			var I18N = Language.getInstance();
+			String i18nKey = Config.CATEGORY_I18N_PREFIX + setting.category;
+
+			return I18N.getOrDefault(i18nKey); // If the key is not found, the key itself is returned instead of the translated text.
+		}
+
+		private static String getLocalizedDescription(ConfigSetting setting)
+		{
+			var I18N = Language.getInstance();
+			String i18nKey = I18N.getOrDefault(I18N_PREFIX + setting.descriptionKey, setting.id.getPath());
+
+			return I18N.getOrDefault(i18nKey); // If the key is not found, the key itself is returned instead of the translated text.
+		}
+
 		@Environment(EnvType.CLIENT)
-		public abstract class Entry extends ContainerObjectSelectionList.Entry<ModOptionList.Entry>
+		public abstract class Entry extends ContainerObjectSelectionList.Entry<Entry>
 		{
 			public abstract void commitChanges();
 			public abstract String getTooltip();
@@ -255,64 +272,29 @@ public class ConfigGui extends Screen
 		}
 
 		@Environment(EnvType.CLIENT)
-		public class OptionEntry extends Entry
+		public class SettingEntry extends Entry
 		{
-			private StringWidget optionLabel;
-			private EditBox editBox;
-			private CheckboxButtonEx checkBox;
-			private CycleButtonEx<Object> enumButton;
-			private final ImageButton needsWorldRestartButton;
-			private final ValidationStatusButton validatedButton;
+			private final StringWidget settingLabel;
+			private final EditBox editBox;
+			private final CheckboxButtonEx checkBox;
+			private final CycleButtonEx<Object> enumButton;
 			private String tooltipText;
-			private final Field valueField;
-			private final Method validatorMethod;
-			private final Method loadMethod;
-			private final ConfigSetting annotation;
-			private Object value;
+			private boolean isValid;
+			private final ImageButton needsWorldRestartButton;
+			private final ImageButton resetButton;
+			private final ImageButton validatedButton;
+			private final ConfigSetting setting;
 
-			public OptionEntry(Field valueField, ConfigSetting annotation, Player player)
+			public SettingEntry(ConfigSetting setting, Player player)
 			{
-				this.valueField = valueField;
-				this.annotation = valueField.getAnnotation(ConfigSetting.class);
-				validatorMethod = Config.getValidator(valueField);
-				Optional<StorageMethods> loadSave = Config.getLoadSave(valueField);
-				loadMethod = (loadSave.isPresent()) ? loadSave.get().load : null;
+				this.setting = setting;
 
-				Object defaultValue = Config.getDefaultValue(valueField);
+				// :BROKEN_PERMISSIONS: For some reason a player without op in multiplayer has no permission level at all instead of 0.
+				var neededPermission = new Permission.HasCommandLevel(PermissionLevel.byId(setting.permissionLvl));
+				boolean widgetIsActive = (setting.permissionLvl == 0) || player.permissions().hasPermission(neededPermission);
 
-				var neededPermission = new Permission.HasCommandLevel(PermissionLevel.byId(annotation.permissionLvl()));
-				boolean widgetIsActive = player.permissions().hasPermission(neededPermission);
-
-				Language I18N = Language.getInstance();
-				String label = I18N.getOrDefault(I18N_PREFIX + annotation.descriptionKey(), valueField.getName());
-				optionLabel = new StringWidget(Component.translatable(label), font);
-
-				// Has to be instantiated before the rest, because 'validateTextFieldInput()', which is called by 'editBox' on validation, sets 'validatedButton' state.
-				validatedButton = new ValidationStatusButton(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, button -> {
-					if (value instanceof Boolean)
-					{
-						checkBox.value = (boolean)defaultValue;
-					}
-					else if (value instanceof Enum)
-					{
-						enumButton.setSelectedValue(defaultValue);
-					}
-					else
-					{
-						editBox.setValue(defaultValue.toString());
-						editBox.setFocused(false);
-					}
-				});
-				validatedButton.active = widgetIsActive;
-
-				try
-				{
-					value = valueField.get(null);
-				}
-				catch (IllegalAccessException ignored)
-				{
-					value = null;
-				}
+				String label = getLocalizedDescription(setting);
+				settingLabel = new StringWidget(Component.literal(label), font);
 
 				checkBox = new CheckboxButtonEx(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, false);
 				enumButton = new CycleButtonEx<>(BUTTON_HEIGHT, value -> ((Enum)value).name());
@@ -321,27 +303,42 @@ public class ConfigGui extends Screen
 				editBox.moveCursorToStart(false);
 				editBox.setResponder(this::validateTextFieldInput);
 
-				if (value instanceof Boolean)
+				// CheckboxButton and CycleButtonEx don't need validation because they can never produce values in an invalid state.
+				boolean widgetNeedsValidation;
+
+				if (setting.isBoolean())
 				{
 					checkBox.active = widgetIsActive;
-					checkBox.value = (boolean)value;
+					checkBox.value = (boolean)setting.value;
+					widgetNeedsValidation = false;
+					isValid = true;
 				}
-				else if (value instanceof Enum)
+				else if (setting.isComplex() && setting.value instanceof Enum)
 				{
 					enumButton.active = widgetIsActive;
-					enumButton.setValues(Arrays.stream(valueField.getType().getEnumConstants()).collect(Collectors.toList()));
-					enumButton.setSelectedValue(value);
+					enumButton.setValues(Arrays.stream(setting.value.getClass().getEnumConstants()).collect(Collectors.toList()));
+					enumButton.setSelectedValue(setting.value);
+					widgetNeedsValidation = false;
+					isValid = true;
 				}
 				else
 				{
 					editBox.setEditable(widgetIsActive);
 					editBox.active = widgetIsActive;
-					editBox.setValue(value.toString());
+					editBox.setValue(setting.value.toString());
+					widgetNeedsValidation = true;
 				}
 
-				needsWorldRestartButton = new ImageButton(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, new WidgetSprites(Identifier.withDefaultNamespace("icon/link")), (b) -> {});
+				resetButton = new ImageButton(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, new WidgetSprites(Utils.createModIdentifier("reset_button"), Utils.createModIdentifier("reset_button_highlighted")), button -> resetValue());
+				resetButton.active = widgetIsActive;
+
+				needsWorldRestartButton = new ImageButton(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, new WidgetSprites(Identifier.withDefaultNamespace("icon/link"), Identifier.withDefaultNamespace("icon/link_highlighted")), (b) -> {});
 				needsWorldRestartButton.active = false;
-				needsWorldRestartButton.visible = annotation.needsWorldRestart();
+				needsWorldRestartButton.visible = setting.needsWorldRestart;
+
+				validatedButton = new ImageButton(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, new WidgetSprites(Identifier.withDefaultNamespace("world_list/error_highlighted"), Identifier.withDefaultNamespace("world_list/error")), (b) -> {});
+				validatedButton.active = false;
+				validatedButton.visible = widgetNeedsValidation;
 
 				tooltipText = null;
 			}
@@ -350,21 +347,28 @@ public class ConfigGui extends Screen
 			public void extractContent(GuiGraphicsExtractor graphics, int mouseX, int mouseY, boolean hovered, float a)
 			{
 				int centerX = width / 2;
-				optionLabel.setPosition(centerX - optionLabel.getWidth() - PADDING, Utils.centerIn(getContentY(), ENTRY_HEIGHT, optionLabel.getHeight()));
-				optionLabel.extractRenderState(graphics, mouseX, mouseY, a);
+				settingLabel.setPosition(centerX - settingLabel.getWidth() - PADDING, Utils.centerIn(getContentY(), ENTRY_HEIGHT, settingLabel.getHeight()));
+				settingLabel.extractRenderState(graphics, mouseX, mouseY, a);
 
-				needsWorldRestartButton.setPosition(getContentRight() - needsWorldRestartButton.getWidth() - PADDING, Utils.centerIn(getContentY(), ENTRY_HEIGHT, needsWorldRestartButton.getHeight()));
+				int xOffsetFromRight = getContentRight() - needsWorldRestartButton.getWidth() - PADDING;
+				needsWorldRestartButton.setPosition(xOffsetFromRight, Utils.centerIn(getContentY(), ENTRY_HEIGHT, needsWorldRestartButton.getHeight()));
 				needsWorldRestartButton.extractRenderState(graphics, mouseX, mouseY, a);
 
-				validatedButton.setPosition(getContentRight() - validatedButton.getWidth() - needsWorldRestartButton.getWidth() - 2 * PADDING, Utils.centerIn(getContentY(), ENTRY_HEIGHT, needsWorldRestartButton.getHeight()));
+				xOffsetFromRight -= (resetButton.getWidth() + PADDING);
+				resetButton.setPosition(xOffsetFromRight, Utils.centerIn(getContentY(), ENTRY_HEIGHT, needsWorldRestartButton.getHeight()));
+				resetButton.extractRenderState(graphics, mouseX, mouseY, a);
+
+				xOffsetFromRight -= (validatedButton.getWidth() + PADDING);
+				validatedButton.setPosition(xOffsetFromRight, Utils.centerIn(getContentY(), ENTRY_HEIGHT, validatedButton.getHeight()));
+				validatedButton.visible = !isValid;
 				validatedButton.extractRenderState(graphics, mouseX, mouseY, a);
 
-				if (value instanceof Boolean)
+				if (setting.isBoolean())
 				{
 					checkBox.setPosition(centerX + PADDING, Utils.centerIn(getContentY(), ENTRY_HEIGHT, checkBox.getHeight()));
 					checkBox.extractRenderState(graphics, mouseX, mouseY, a);
 				}
-				else if (value instanceof Enum)
+				else if (setting.isComplex() && setting.value instanceof Enum)
 				{
 					enumButton.setPosition(centerX + PADDING, Utils.centerIn(getContentY(), ENTRY_HEIGHT, enumButton.getHeight()));
 					enumButton.setWidth(validatedButton.getX() - enumButton.getX() - PADDING);
@@ -379,29 +383,37 @@ public class ConfigGui extends Screen
 
 				Language I18N = Language.getInstance();
 
-				// Set tooltip to be rendered by the ModOptionList. This could be moved to mouseMoved(), but either
-				// the tooltip for the description text would have to stay here or its bounds would have to be stored.
-				// To not complicate things, keep everything here for now.
-				if ((mouseX >= optionLabel.getX()) &&
-					(mouseX < (optionLabel.getX() + optionLabel.getWidth())) &&
-					(mouseY >= optionLabel.getY()) &&
-					(mouseY < (optionLabel.getY() + optionLabel.getHeight())))
+				// Set tooltip to be rendered. This could be moved to mouseMoved(), but either the tooltip for the description text
+				// would have to stay here or its bounds would have to be stored. To not complicate things, keep everything here for now.
+				if ((mouseX >= settingLabel.getX()) &&
+					(mouseX < (settingLabel.getX() + settingLabel.getWidth())) &&
+					(mouseY >= settingLabel.getY()) &&
+					(mouseY < (settingLabel.getY() + settingLabel.getHeight())))
 				{
 					// Tooltip for the description.
 					// If the key is not found, the key itself is returned instead of the translated text.
-					String i18nTooltipKey = I18N_PREFIX + annotation.descriptionKey() + I18N_TOOLTIP_SUFFIX;
+					String i18nTooltipKey = I18N_PREFIX + setting.descriptionKey + I18N_TOOLTIP_SUFFIX;
 					String i18nTooltipText = I18N.getOrDefault(i18nTooltipKey);
-					tooltipText = (!i18nTooltipText.equals(i18nTooltipKey)) ? i18nTooltipText : annotation.description();
+					tooltipText = (!i18nTooltipText.equals(i18nTooltipKey)) ? i18nTooltipText : setting.description;
 				}
-				else if ((mouseX >= validatedButton.getX()) &&
+				else if ((mouseX >= resetButton.getX()) &&
+						 (mouseX < (resetButton.getX() + resetButton.getWidth())) &&
+						 (mouseY >= resetButton.getY()) &&
+						 (mouseY < (resetButton.getY() + resetButton.getHeight())))
+				{
+					// Tooltip for the validation button.
+					tooltipText = I18N.getOrDefault(I18N_RESET);
+				}
+				else if (validatedButton.visible &&
+						(mouseX >= validatedButton.getX()) &&
 						(mouseX < (validatedButton.getX() + validatedButton.getWidth())) &&
 						(mouseY >= validatedButton.getY()) &&
 						(mouseY < (validatedButton.getY() + validatedButton.getHeight())))
 				{
 					// Tooltip for the validation button.
-					tooltipText = (validatedButton.isValid()) ? I18N.getOrDefault(I18N_VALID) : I18N.getOrDefault(I18N_INVALID);
+					tooltipText = I18N.getOrDefault(I18N_INVALID);
 				}
-				else if (annotation.needsWorldRestart() &&
+				else if (setting.needsWorldRestart &&
 						(mouseX >= needsWorldRestartButton.getX()) &&
 						(mouseX < (needsWorldRestartButton.getX() + needsWorldRestartButton.getWidth())) &&
 						(mouseY >= needsWorldRestartButton.getY()) &&
@@ -419,66 +431,45 @@ public class ConfigGui extends Screen
 			@Override
 			public void commitChanges()
 			{
-				Class<?> fieldType = valueField.getType();
-
-				if (fieldType == boolean.class)
+				if (setting.isBoolean())
 				{
-					try
-					{
-						valueField.set(null, this.checkBox.value);
-					}
-					catch (IllegalAccessException ignored) {}
+					setting.value = checkBox.value;
 				}
-				else if (fieldType.isEnum())
+				else if (setting.isComplex() && setting.value instanceof Enum)
 				{
-					try
-					{
-						valueField.set(null, this.enumButton.getSelectedValue());
-					}
-					catch (IllegalAccessException ignored) {}
+					setting.value = enumButton.getSelectedValue();
 				}
 				else
 				{
-					String text = this.editBox.getValue();
+					String inputText = editBox.getValue();
 
 					try
 					{
-						if (fieldType == int.class)
+						switch (setting.valueType)
 						{
-							int parsedValue = Integer.parseInt(text);
-
-							if ((this.validatorMethod == null) || (boolean)this.validatorMethod.invoke(null, parsedValue))
+							case Int ->
 							{
-								valueField.set(null, parsedValue);
+								int parsedValue = Integer.parseInt(inputText);
+								if (setting.isValid(parsedValue)) setting.value = parsedValue;
 							}
-						}
-						else if (fieldType == float.class)
-						{
-							float parsedValue = Float.parseFloat(text);
-
-							if ((this.validatorMethod == null) || (boolean)this.validatorMethod.invoke(null, parsedValue))
+							case Float ->
 							{
-								valueField.set(null, parsedValue);
+								float parsedValue = Float.parseFloat(inputText);
+								if (setting.isValid(parsedValue)) setting.value = parsedValue;
 							}
-						}
-						else if (fieldType == String.class)
-						{
-							if ((this.validatorMethod == null) || (boolean)this.validatorMethod.invoke(null, text))
+							case String ->
 							{
-								valueField.set(null, text);
+								if (setting.isValid(inputText)) setting.value = inputText;
 							}
-						}
-						else
-						{
-							Object parsedValue = this.loadMethod.invoke(null, text);
 
-							if ((parsedValue != null) && ((this.validatorMethod == null) || (boolean)this.validatorMethod.invoke(null, parsedValue)))
+							case Complex ->
 							{
-								valueField.set(null, parsedValue);
+								Object parsedValue = setting.destringify(inputText);
+								if (setting.isValid(parsedValue)) setting.value = parsedValue;
 							}
 						}
 					}
-					catch (NumberFormatException | IllegalAccessException | InvocationTargetException ignored) {}
+					catch (NumberFormatException ignored) {}
 				}
 			}
 
@@ -488,42 +479,45 @@ public class ConfigGui extends Screen
 				return this.tooltipText;
 			}
 
-			// Sets the state of the ValidationStatusButton button based on the input in the EditBox.
+			private void resetValue()
+			{
+				if (setting.isBoolean())
+				{
+					checkBox.value = (boolean)setting.defaultValue;
+				}
+				else if (setting.isComplex() && setting.value instanceof Enum)
+				{
+					enumButton.setSelectedValue(setting.defaultValue);
+				}
+				else
+				{
+					editBox.setValue(setting.canStringify() ? setting.stringifyDefaultValue() : setting.defaultValue.toString());
+				}
+			}
+
 			private void validateTextFieldInput(String text)
 			{
-				Object value;
+				isValid = setting.validator.isEmpty();
 
-				try
+				if (!isValid)
 				{
-					value = this.valueField.get(null);
+					var validator = setting.validator.get();
 
-					if (value instanceof Integer)
+					try
 					{
-						int parsedValue = Integer.parseInt(text);
-						boolean isValid = (this.validatorMethod == null) || (boolean) this.validatorMethod.invoke(null, parsedValue);
-						this.validatedButton.setValid(isValid);
+						isValid = switch (setting.valueType)
+						{
+							case Int -> validator.apply(Integer.parseInt(text));
+							case Float -> validator.apply(Float.parseFloat(text));
+							case String -> validator.apply(text);
+							case Complex -> validator.apply(setting.destringify(text));
+							default -> true;
+						};
 					}
-					else if (value instanceof Float)
+					catch (NumberFormatException _)
 					{
-						float parsedValue = Float.parseFloat(text);
-						boolean isValid = (this.validatorMethod == null) || (boolean) this.validatorMethod.invoke(null, parsedValue);
-						this.validatedButton.setValid(isValid);
+						isValid = false;
 					}
-					else if (value instanceof String)
-					{
-						boolean isValid = (this.validatorMethod == null) || (boolean) this.validatorMethod.invoke(null, text);
-						this.validatedButton.setValid(isValid);
-					}
-					else
-					{
-						Object parsedValue = this.loadMethod.invoke(null, text);
-						boolean isValid = (this.validatorMethod == null) || (boolean) this.validatorMethod.invoke(null, parsedValue);
-						this.validatedButton.setValid(isValid);
-					}
-				}
-				catch (NumberFormatException | IllegalAccessException | InvocationTargetException ex)
-				{
-					this.validatedButton.setInvalid();
 				}
 			}
 
@@ -536,7 +530,7 @@ public class ConfigGui extends Screen
 			@Override
 			public List<? extends GuiEventListener> children()
 			{
-				return List.of(optionLabel, editBox, checkBox, enumButton, validatedButton, needsWorldRestartButton);
+				return List.of(settingLabel, editBox, checkBox, enumButton, resetButton, needsWorldRestartButton, validatedButton);
 			}
 		}
 	}

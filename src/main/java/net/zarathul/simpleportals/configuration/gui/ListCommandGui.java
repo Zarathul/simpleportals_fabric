@@ -321,7 +321,7 @@ public class ListCommandGui extends Screen
 				locationBox.setEditable(false);
 				locationBox.moveCursorToStart(false);
 
-				gotoLocationButton = new ImageButton(0, 0, GOTO_BUTTON_SIZE, GOTO_BUTTON_SIZE, new WidgetSprites(Identifier.withDefaultNamespace("icon/link")), button -> {
+				gotoLocationButton = new ImageButton(0, 0, GOTO_BUTTON_SIZE, GOTO_BUTTON_SIZE, new WidgetSprites(Utils.createModIdentifier("teleport"), Utils.createModIdentifier("teleport_highlighted")), button -> {
 					minecraft.gui.setScreen(null);
 					ClientPlayNetworking.send(new SimplePortals.TpdCommandPayload(portal.dimension().identifier(), portal.location()));
 				});

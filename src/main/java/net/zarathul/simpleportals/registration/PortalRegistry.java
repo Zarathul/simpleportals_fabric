@@ -194,8 +194,8 @@ public final class PortalRegistry extends SavedData
 		
 		// Check size
 		
-		if (getDistance(corner1.pos(), corner2.pos()) > Settings.maxSize
-			|| getDistance(corner1.pos(), corner3.pos()) > Settings.maxSize) return false;
+		if (getDistance(corner1.pos(), corner2.pos()) > Settings.maxSize()
+			|| getDistance(corner1.pos(), corner3.pos()) > Settings.maxSize()) return false;
 		
 		// Check address blocks validity
 		
@@ -417,7 +417,7 @@ public final class PortalRegistry extends SavedData
 		if (portal == null || amount < 1) return amount;
 		
 		int oldAmount = getPortalPower(portal);
-		int freeCapacity = Math.max(Settings.powerCapacity - oldAmount, 0);
+		int freeCapacity = Math.max(Settings.powerCapacity() - oldAmount, 0);
 		int amountToAdd = Math.min(freeCapacity, amount);
 		int surplus = amount - amountToAdd;
 		
@@ -778,7 +778,7 @@ public final class PortalRegistry extends SavedData
 			currentPos = currentPos.relative(searchDir);
 			size++;
 		}
-		while (size <= Settings.maxSize);
+		while (size <= Settings.maxSize());
 		
 		return null;
 	}

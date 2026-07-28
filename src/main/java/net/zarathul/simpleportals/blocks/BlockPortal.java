@@ -129,12 +129,12 @@ public class BlockPortal extends Block implements net.minecraft.world.level.bloc
 	@Environment(EnvType.CLIENT)
 	public void animateTick(BlockState state, Level world, BlockPos pos, RandomSource random)
 	{
-		if (Settings.ambientSoundEnabled && random.nextInt(100) == 0)
+		if (Settings.ambientSoundEnabled() && random.nextInt(100) == 0)
 		{
 			world.playLocalSound((double)pos.getX() + 0.5D, (double)pos.getY() + 0.5D, (double)pos.getZ() + 0.5D, SoundEvents.PORTAL_AMBIENT, SoundSource.BLOCKS, 0.5F, random.nextFloat() * 0.4F + 0.8F, false);
 		}
 
-		if (Settings.particlesEnabled)
+		if (Settings.particlesEnabled())
 		{
 			for (int i = 0; i < 4; ++i)
 			{
@@ -171,7 +171,7 @@ public class BlockPortal extends Block implements net.minecraft.world.level.bloc
 	@Override
 	public int getPortalTransitionTime(ServerLevel level, Entity entity)
 	{
-		return (entity instanceof Player) ? Settings.playerTeleportationDelay : 0;
+		return (entity instanceof Player) ? Settings.playerTeleportationDelay() : 0;
 	}
 
 	@Override
@@ -210,17 +210,17 @@ public class BlockPortal extends Block implements net.minecraft.world.level.bloc
 		// Bypass the power cost for players in creative mode
 		boolean bypassPowerCost = (entity instanceof ServerPlayer && ((ServerPlayer)entity).isCreative());
 
-		if (destination != null && (bypassPowerCost || Settings.powerCost == 0 || SimplePortals.portalRegistry.removePower(startPortal, Settings.powerCost)))
+		if (destination != null && (bypassPowerCost || Settings.powerCost() == 0 || SimplePortals.portalRegistry.removePower(startPortal, Settings.powerCost())))
 		{
 			TeleportTransition.PostTeleportTransition postTransition = TeleportTransition.PLACE_PORTAL_TICKET;
-			if (Settings.teleportationSoundEnabled) postTransition = postTransition.then(TeleportTransition.PLAY_PORTAL_SOUND);
+			if (Settings.teleportationSoundEnabled()) postTransition = postTransition.then(TeleportTransition.PLAY_PORTAL_SOUND);
 			Vec3 destinationVector = new Vec3(destination.pos().getX() + 0.5d, destination.pos().getY(), destination.pos().getZ() + 0.5d);
 
 			return new TeleportTransition(destinationWorld, destinationVector, Vec3.ZERO, destination.facing().toYRot(), entity.xRotO, postTransition);
 		}
 		else
 		{
-			if (Settings.notEnoughPowerSoundEnabled) currentLevel.playSound(null, portalEntryPos, SoundEvents.END_PORTAL_FRAME_FILL, SoundSource.BLOCKS);
+			if (Settings.notEnoughPowerSoundEnabled()) currentLevel.playSound(null, portalEntryPos, SoundEvents.END_PORTAL_FRAME_FILL, SoundSource.BLOCKS);
 
 			return null;
 		}
@@ -229,21 +229,21 @@ public class BlockPortal extends Block implements net.minecraft.world.level.bloc
 	@Override
 	public Transition getLocalTransition()
 	{
-		return (Settings.transitionEffectEnabled) ? Transition.CONFUSION : Transition.NONE;
+		return (Settings.transitionEffectEnabled()) ? Transition.CONFUSION : Transition.NONE;
 	}
 
 	private boolean handlePowerSourceEnteringPortal(Level world, BlockPos pos, Entity entity)
 	{
-		if (entity instanceof ItemEntity && Settings.powerCost > 0 && Settings.powerCapacity > 0)
+		if (entity instanceof ItemEntity && Settings.powerCost() > 0 && Settings.powerCapacity() > 0)
 		{
-			if (Settings.powerSourceTag == null)
+			if (Settings.powerSourceTag() == null)
 			{
-				SimplePortals.log.error("Misconfigured portal power source. The item tag '{}' could not be found.", Settings.powerSource);
+				SimplePortals.log.error("Misconfigured portal power source. The item tag '{}' could not be found.", Settings.powerSource());
 				return false;
 			}
 
 			ItemStack itemStack = ((ItemEntity)entity).getItem();
-			if (!itemStack.is(Settings.powerSourceTag)) return false;
+			if (!itemStack.is(Settings.powerSourceTag())) return false;
 
 			List<Portal> portals = SimplePortals.portalRegistry.getPortalsAt(pos, world.dimension());
 			if (portals.isEmpty()) return false;
@@ -253,7 +253,7 @@ public class BlockPortal extends Block implements net.minecraft.world.level.bloc
 
 			Portal portal = portals.getFirst();
 
-			if ((SimplePortals.portalRegistry.getPortalPower(portal) < Settings.powerCapacity))
+			if ((SimplePortals.portalRegistry.getPortalPower(portal) < Settings.powerCapacity()))
 			{
 				int surplus = SimplePortals.portalRegistry.addPower(portal, itemStack.getCount());
 
