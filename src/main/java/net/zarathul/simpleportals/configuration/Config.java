@@ -35,12 +35,16 @@ public class Config
 		return true;
 	}
 
-	public static List<ConfigSetting> getMergedSettings()
+	public static List<ConfigSetting> getMergedSettings(List<ConfigValue> receivedServerValues)
 	{
 		List<ConfigSetting> settings = new ArrayList<>(registry.size());
 
 		registry.values().stream().filter(setting -> setting.clientOnly).forEach(settings::add);
-		settings.addAll(serverRegistry.values());
+		// Since the server will only send ConfigValues for settings the player has the required permissions for,
+		// those can be used to filter out the other settings and not show them in the gui.
+		receivedServerValues.forEach(configValue -> {
+			if (serverRegistry.containsKey(configValue.id)) settings.add(serverRegistry.get(configValue.id));
+		});
 
 		return settings;
 	}
@@ -521,8 +525,10 @@ public class Config
 	private static void createConfigFile(Path file, boolean initToDefaults, boolean skipClientOnly)
 	{
 		StringBuilder builder = new StringBuilder();
+		// Sort the entries by the key, this way the ordering in the config file does not change all the time.
+		var sortedEntries = registry.entrySet().stream().sorted(Comparator.comparing(Map.Entry::getKey)).toList();
 
-		for (var entry : registry.entrySet())
+		for (var entry : sortedEntries)
 		{
 			var configValue = entry.getValue();
 

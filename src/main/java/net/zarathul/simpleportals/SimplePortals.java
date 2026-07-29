@@ -38,7 +38,6 @@ import net.zarathul.simpleportals.blocks.BlockPortalFrame;
 import net.zarathul.simpleportals.blocks.BlockPowerGauge;
 import net.zarathul.simpleportals.commands.CommandPortals;
 import net.zarathul.simpleportals.commands.CommandTeleport;
-import net.zarathul.simpleportals.commands.ConfigCommandMode;
 import net.zarathul.simpleportals.commands.arguments.BlockArgument;
 import net.zarathul.simpleportals.common.Utils;
 import net.zarathul.simpleportals.configuration.Config;
@@ -52,10 +51,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.NonNull;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 public class SimplePortals implements ModInitializer
 {
@@ -122,7 +119,7 @@ public class SimplePortals implements ModInitializer
 		PayloadTypeRegistry.serverboundPlay().register(TpdCommandPayload.TYPE, TpdCommandPayload.CODEC);
 
 		// Register Commands.
-		CommandRegistrationCallback.EVENT.register((dispatcher, registry, environment) -> {
+		CommandRegistrationCallback.EVENT.register((dispatcher, buildContext, selection) -> {
 			CommandPortals.register(dispatcher);
 			CommandTeleport.register(dispatcher);
 		});
@@ -138,16 +135,15 @@ public class SimplePortals implements ModInitializer
 		// Cache the power source item tag on data pack reload and server start.
 		// The server start hook is necessary because when the config is initially loaded,
 		// the Tag list does not exist yet.
-
 		ServerLifecycleEvents.END_DATA_PACK_RELOAD.register((server, serverResources, success) -> {
 			// The validator already does the caching so just use that.
 			Settings.powerSourceIsValid(Settings.powerSource());
 		});
 
+		// Load or create config file. Doing this at the start of onInitialize() would be preferable, but that leads to the validator of Settings.powerSource() failing.
+		// This happens because registries are not fully set up at that time, which the validator queries.
 		ServerLifecycleEvents.SERVER_STARTED.register((server) -> {
 			onDedicatedServer = server.isDedicatedServer();
-			// Load or create config file. Doing this at the start of onInitialize() would be preferable, but that leads to the validator of Settings.powerSource() failing.
-			// This happens because registries are not fully set up at that time, which the validator queries.
 			Config.reset();
 			Settings.init();
 			Config.loadOrCreateConfigFile(MOD_ID, onDedicatedServer);
@@ -173,51 +169,12 @@ public class SimplePortals implements ModInitializer
 			return InteractionResult.PASS;
 		});
 
-		// Server side receiver for the config command. Responsible for sending back server side settings to the client.
+		// Server side receiver for the config command. Stores the received settings in the config of the server,
+		// assuming the player has the required permissions.
 		ServerPlayNetworking.registerGlobalReceiver(ConfigCommandPayload.TYPE, (payload, ctx) -> {
 			var player = ctx.player();
-
-			switch (payload.mode)
-			{
-				case GetServerSettings ->
-				{
-					List<Config.ConfigValue> configValues = new ArrayList<>();
-					Config.writeServerSettings(false, configValues, player);
-					ConfigCommandPayload outgoingPayload = new ConfigCommandPayload(ConfigCommandMode.GetServerSettings, configValues, onDedicatedServer);
-
-					ServerPlayNetworking.send(player, outgoingPayload);
-				}
-				case SetServerSettings ->
-				{
-					Config.readServerSettings(false, payload.values, player);
-					Config.save(MOD_ID, true);
-				}
-			}
-		});
-
-		// Server side receiver for the list command. Responsible for sending back portal data to the client.
-		ServerPlayNetworking.registerGlobalReceiver(ListCommandPayload.TYPE, (payload, ctx) -> {
-			var player = ctx.player();
-
-			if (!player.permissions().hasPermission(Permissions.COMMANDS_OWNER))
-			{
-				player.sendSystemMessage(Component.translatable("missing_permission"));
-				return;
-			}
-
-			// Generate a PortalInfo for every registered portal.
-			List<PortalInfo> portals = portalRegistry.getAllPortals().stream()
-				.map(portal -> new PortalInfo(
-					portal.dimension(),
-					portal.corner1().pos(),
-					portal.address(),
-					portalRegistry.getPortalPower(portal))
-				)
-				.collect(Collectors.toList());
-
-			ListCommandPayload outgoingPayload = new ListCommandPayload(portals);
-
-			ServerPlayNetworking.send(player, outgoingPayload);
+			Config.readServerSettings(false, payload.values, player);
+			Config.save(MOD_ID, true);
 		});
 
 		// Server side receiver for clicking on the teleport to portal button in the ListCommandGui.
@@ -314,12 +271,11 @@ public class SimplePortals implements ModInitializer
 		}
 	}
 
-	public record ConfigCommandPayload(ConfigCommandMode mode, List<Config.ConfigValue> values, boolean fromDedicatedServer) implements CustomPacketPayload
+	public record ConfigCommandPayload(List<Config.ConfigValue> values, boolean fromDedicatedServer) implements CustomPacketPayload
 	{
 		public static final Identifier ID = Utils.createModIdentifier("config_command");
 		public static final CustomPacketPayload.Type<ConfigCommandPayload> TYPE = new CustomPacketPayload.Type<>(ID);
 		public static final StreamCodec<FriendlyByteBuf, ConfigCommandPayload> CODEC = StreamCodec.composite(
-				ConfigCommandMode.STREAM_CODEC, ConfigCommandPayload::mode,
 				Config.LIST_STREAM_CODEC, ConfigCommandPayload::values,
 				ByteBufCodecs.BOOL, ConfigCommandPayload::fromDedicatedServer,
 				ConfigCommandPayload::new

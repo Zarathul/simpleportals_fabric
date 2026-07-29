@@ -1,23 +1,18 @@
 package net.zarathul.simpleportals;
 
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.permissions.Permissions;
 import net.zarathul.simpleportals.SimplePortals.ConfigCommandPayload;
-import net.zarathul.simpleportals.commands.ConfigCommandMode;
 import net.zarathul.simpleportals.configuration.Config;
 import net.zarathul.simpleportals.configuration.ConfigSetting;
 import net.zarathul.simpleportals.configuration.gui.ConfigGui;
 import net.zarathul.simpleportals.configuration.gui.ListCommandGui;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 public class ClientInit implements ClientModInitializer
@@ -25,7 +20,9 @@ public class ClientInit implements ClientModInitializer
 	@Override
 	public void onInitializeClient()
 	{
-		ClientLifecycleEvents.CLIENT_STARTED.register(minecraft -> {
+		// Loading the config earlier can cause the validator of the power_source setting to fail, if a fabric tag is set,
+		// because those are loader later.
+		ClientPlayConnectionEvents.JOIN.register((listener, sender, client) -> {
 			Config.reset();
 			Settings.init();
 			Config.loadOrCreateConfigFile(SimplePortals.MOD_ID, false);
@@ -46,31 +43,6 @@ public class ClientInit implements ClientModInitializer
 			}
 		});
 
-		ClientCommandRegistrationCallback.EVENT.register((dispatcher, builderContext) -> {
-			dispatcher.register(
-				ClientCommands.literal("sportals")
-					.then(
-						ClientCommands.literal("config")	// sportals config
-							.executes(context -> {
-								var payload = new ConfigCommandPayload(ConfigCommandMode.GetServerSettings, Collections.emptyList(), false);
-								ClientPlayNetworking.send(payload);
-
-								return 1;
-							})
-					)
-					.then(
-						ClientCommands.literal("list")
-							.requires(commandSource -> commandSource.permissions().hasPermission(Permissions.COMMANDS_OWNER))
-							.executes(context -> {
-								var payload = new SimplePortals.ListCommandPayload(Collections.emptyList());
-								ClientPlayNetworking.send(payload);
-
-								return 1;
-							})
-					)
-			);
-		});
-
 		// Receiver for server side settings if a config command was issued.
 		ClientPlayNetworking.registerGlobalReceiver(SimplePortals.ConfigCommandPayload.TYPE, (payload, ctx) -> {
 			var client = ctx.client();
@@ -83,7 +55,7 @@ public class ClientInit implements ClientModInitializer
 			if (fromRemoteServer)
 			{
 				Config.readServerSettings(fromRemoteServer, payload.values(), ctx.player());
-				settings = Config.getMergedSettings();
+				settings = Config.getMergedSettings(payload.values());
 			}
 			else
 			{
@@ -99,7 +71,7 @@ public class ClientInit implements ClientModInitializer
 
 					if (!configValues.isEmpty())
 					{
-						ConfigCommandPayload outgoingPayload = new ConfigCommandPayload(ConfigCommandMode.SetServerSettings, configValues, false);
+						ConfigCommandPayload outgoingPayload = new ConfigCommandPayload(configValues, false);
 						ClientPlayNetworking.send(outgoingPayload);
 					}
 				}

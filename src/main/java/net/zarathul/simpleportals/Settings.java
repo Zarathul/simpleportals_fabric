@@ -1,6 +1,5 @@
 package net.zarathul.simpleportals;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
@@ -12,17 +11,18 @@ import net.zarathul.simpleportals.configuration.ConfigSetting;
 public final class Settings
 {
 	private static TagKey<Item> powerSourceTag;
-	private static final Identifier MAX_SIZE = Utils.createModIdentifier("max_size");
-	private static final Identifier POWER_COST = Utils.createModIdentifier("power_cost");
-	private static final Identifier POWER_CAPACITY = Utils.createModIdentifier("power_capacity");
-	private static final Identifier PLAYER_TELEPORTATION_DELAY = Utils.createModIdentifier("player_teleportation_delay");
-	private static final Identifier POWER_SOURCE = Utils.createModIdentifier("power_source");
-	private static final Identifier TELEPORTATION_SOUND_ENABLED = Utils.createModIdentifier("teleportation_sound_enabled");
-	private static final Identifier PORTAL_ACTIVATION_SOUND_ENABLED = Utils.createModIdentifier("portal_activation_sound_enabled");
-	private static final Identifier NOT_ENOUGH_POWER_SOUND_ENABLED = Utils.createModIdentifier("not_enough_power_sound_enabled");
-	private static final Identifier PARTICLES_ENABLED = Utils.createModIdentifier("particles_enabled");
-	private static final Identifier AMBIENT_SOUND_ENABLED = Utils.createModIdentifier("ambient_sound_enabled");
-	private static final Identifier TRANSITION_EFFECT_ENABLED = Utils.createModIdentifier("transition_effect_enabled");
+
+	public static final Identifier MAX_SIZE = Utils.createModIdentifier("max_size");
+	public static final Identifier POWER_COST = Utils.createModIdentifier("power_cost");
+	public static final Identifier POWER_CAPACITY = Utils.createModIdentifier("power_capacity");
+	public static final Identifier PLAYER_TELEPORTATION_DELAY = Utils.createModIdentifier("player_teleportation_delay");
+	public static final Identifier POWER_SOURCE = Utils.createModIdentifier("power_source");
+	public static final Identifier TELEPORTATION_SOUND_ENABLED = Utils.createModIdentifier("teleportation_sound_enabled");
+	public static final Identifier PORTAL_ACTIVATION_SOUND_ENABLED = Utils.createModIdentifier("portal_activation_sound_enabled");
+	public static final Identifier NOT_ENOUGH_POWER_SOUND_ENABLED = Utils.createModIdentifier("not_enough_power_sound_enabled");
+	public static final Identifier PARTICLES_ENABLED = Utils.createModIdentifier("particles_enabled");
+	public static final Identifier AMBIENT_SOUND_ENABLED = Utils.createModIdentifier("ambient_sound_enabled");
+	public static final Identifier TRANSITION_EFFECT_ENABLED = Utils.createModIdentifier("transition_effect_enabled");
 
 	public static TagKey<Item> powerSourceTag() { return powerSourceTag; }
 	public static int maxSize() { return (int) Config.getSetting(MAX_SIZE).get().value; }
