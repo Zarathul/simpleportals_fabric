@@ -104,6 +104,10 @@
 	"config.location_header": "§nStandort",
 	"config.address_header": "§nAdresse",
 	"config.power_header": "§nEnergie",
+	"config.goto_portal": "Zum Portal teleportieren",
+	"config.add_power": "Fülle das Portal bis zur maximalen Kapazität mit Energie",
+	"config.remove_power": "Entferne alle Energie aus dem Portal",
+	"config.deactivate": "Deaktiviere das Portal",
 
 	"_comment": "Misc",
 	"missing_permission": "Du hast nicht die benötigten Rechte.",

@@ -5,7 +5,9 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.NonNull;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
@@ -17,7 +19,7 @@ import java.util.function.BiConsumer;
  * {@link PortalRegistry#getAddressBlockId(net.minecraft.world.level.block.Block)}.
  * Multiple blocks with the same name/meta are allowed.
  */
-public class Address
+public class Address implements Comparable<Address>
 {
 	public static final Codec<Address> CODEC = RecordCodecBuilder.create(instance -> instance.group(
 			Codec.unboundedMap(Codec.STRING, Codec.INT).fieldOf("blockCounts").forGetter(Address::getBlockCounts)
@@ -56,7 +58,7 @@ public class Address
 	 */
 	public Map<String, Integer> getBlockCounts()
 	{
-		return blockCounts;
+		return Collections.unmodifiableMap(blockCounts);
 	}
 	
 	/**
@@ -187,7 +189,6 @@ public class Address
 	
 	/**
 	 * Generates a readable representation of the address.
-	 * 
 	 * The format is <code>blockIdxblockCount</code> for every
 	 * block id, delimited by <code>,</code>.
 	 */
@@ -196,8 +197,9 @@ public class Address
 		if (blockCounts == null) return;
 		
 		StringBuilder nameBuilder = new StringBuilder();
+		var blockCountsSortedByBlockId = blockCounts.entrySet().stream().sorted((o1, o2) -> o1.getKey().compareTo(o2.getKey())).toList();
 		
-		for (Entry<String, Integer> blockCount : blockCounts.entrySet())
+		for (Entry<String, Integer> blockCount : blockCountsSortedByBlockId)
 		{
 			nameBuilder.append(blockCount.getValue());
 			nameBuilder.append('x');
@@ -208,5 +210,14 @@ public class Address
 		nameBuilder.delete(nameBuilder.length() - 2, nameBuilder.length());
 		
 		readableName = nameBuilder.toString();
+	}
+
+	@Override
+	public int compareTo(@NonNull Address other)
+	{
+		if (blockCounts.size() < other.getBlockCounts().size()) return -1;
+		if (blockCounts.size() > other.getBlockCounts().size()) return 1;
+
+		return toString().compareTo(other.toString());
 	}
 }

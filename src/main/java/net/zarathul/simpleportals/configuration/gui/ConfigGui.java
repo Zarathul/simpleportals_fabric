@@ -134,7 +134,7 @@ public class ConfigGui extends Screen
 
 				if (tooltip != null && !tooltip.isEmpty())
 				{
-					List<Component> comment = Arrays.stream(tooltip.split("\n")).map(Component::translatable).collect(Collectors.toList());
+					List<Component> comment = Arrays.stream(tooltip.split("\n")).map(Component::literal).collect(Collectors.toList());
 					graphics.setComponentTooltipForNextFrame(font, comment, mouseX, mouseY);
 
 					break;
@@ -385,10 +385,7 @@ public class ConfigGui extends Screen
 
 				// Set tooltip to be rendered. This could be moved to mouseMoved(), but either the tooltip for the description text
 				// would have to stay here or its bounds would have to be stored. To not complicate things, keep everything here for now.
-				if ((mouseX >= settingLabel.getX()) &&
-					(mouseX < (settingLabel.getX() + settingLabel.getWidth())) &&
-					(mouseY >= settingLabel.getY()) &&
-					(mouseY < (settingLabel.getY() + settingLabel.getHeight())))
+				if (mouseIsInsideWidgetsBounds(settingLabel, mouseX, mouseY))
 				{
 					// Tooltip for the description.
 					// If the key is not found, the key itself is returned instead of the translated text.
@@ -396,28 +393,17 @@ public class ConfigGui extends Screen
 					String i18nTooltipText = I18N.getOrDefault(i18nTooltipKey);
 					tooltipText = (!i18nTooltipText.equals(i18nTooltipKey)) ? i18nTooltipText : setting.description;
 				}
-				else if ((mouseX >= resetButton.getX()) &&
-						 (mouseX < (resetButton.getX() + resetButton.getWidth())) &&
-						 (mouseY >= resetButton.getY()) &&
-						 (mouseY < (resetButton.getY() + resetButton.getHeight())))
+				else if (mouseIsInsideWidgetsBounds(resetButton, mouseX, mouseY))
 				{
 					// Tooltip for the validation button.
 					tooltipText = I18N.getOrDefault(I18N_RESET);
 				}
-				else if (validatedButton.visible &&
-						(mouseX >= validatedButton.getX()) &&
-						(mouseX < (validatedButton.getX() + validatedButton.getWidth())) &&
-						(mouseY >= validatedButton.getY()) &&
-						(mouseY < (validatedButton.getY() + validatedButton.getHeight())))
+				else if (validatedButton.visible && mouseIsInsideWidgetsBounds(validatedButton, mouseX, mouseY))
 				{
 					// Tooltip for the validation button.
 					tooltipText = I18N.getOrDefault(I18N_INVALID);
 				}
-				else if (setting.needsWorldRestart &&
-						(mouseX >= needsWorldRestartButton.getX()) &&
-						(mouseX < (needsWorldRestartButton.getX() + needsWorldRestartButton.getWidth())) &&
-						(mouseY >= needsWorldRestartButton.getY()) &&
-						(mouseY < (needsWorldRestartButton.getY() + needsWorldRestartButton.getHeight())))
+				else if (setting.needsWorldRestart && mouseIsInsideWidgetsBounds(needsWorldRestartButton, mouseX, mouseY))
 				{
 					// Tooltip for the needs world restart button.
 					tooltipText = I18N.getOrDefault(I18N_NEEDS_WORLD_RESTART);
@@ -476,7 +462,7 @@ public class ConfigGui extends Screen
 			@Override
 			public String getTooltip()
 			{
-				return this.tooltipText;
+				return tooltipText;
 			}
 
 			private void resetValue()
@@ -519,6 +505,14 @@ public class ConfigGui extends Screen
 						isValid = false;
 					}
 				}
+			}
+
+			private static boolean mouseIsInsideWidgetsBounds(AbstractWidget widget, int mouseX, int mouseY)
+			{
+				return ((mouseX >= widget.getX()) &&
+						(mouseX <  widget.getRight()) &&
+						(mouseY >= widget.getY()) &&
+						(mouseY <  widget.getBottom()));
 			}
 
 			@Override

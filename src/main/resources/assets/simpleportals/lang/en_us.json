@@ -104,6 +104,10 @@
 	"config.location_header": "§nLocation",
 	"config.address_header": "§nAddress",
 	"config.power_header": "§nPower",
+	"config.goto_portal": "Teleport to Portal",
+	"config.add_power": "Fill the Portal power to maximum capacity",
+	"config.remove_power": "Remove all power from the Portal",
+	"config.deactivate": "Deactivate the Portal",
 
 	"_comment": "Misc",
 	"missing_permission": "Your are missing the required permissions.",

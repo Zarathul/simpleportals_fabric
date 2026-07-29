@@ -12,19 +12,24 @@ import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
 import net.minecraft.client.gui.layouts.LinearLayout;
 import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
+import net.zarathul.simpleportals.Settings;
 import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.common.Utils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 
 @Environment(EnvType.CLIENT)
@@ -45,7 +50,7 @@ public class ListCommandGui extends Screen
 	private static final int PADDING = 5;
 	private static final int BUTTON_HEIGHT = Button.DEFAULT_HEIGHT;
 	private static final int ADDRESS_ITEM_SIZE = Button.DEFAULT_HEIGHT;
-	private static final int GOTO_BUTTON_SIZE = Button.DEFAULT_HEIGHT;
+	private static final int IMAGE_BUTTON_SIZE = Button.DEFAULT_HEIGHT;
 	private static final int FOOTER_HEIGHT = BUTTON_HEIGHT + 2 * PADDING;
 	private static final int ENTRY_HEIGHT = 26;
 
@@ -72,6 +77,9 @@ public class ListCommandGui extends Screen
 
 		this.portals = portals;
 		this.filter = filter;
+
+		// Sort by address
+		this.portals.sort((o1, o2) -> o1.address().compareTo(o2.address()));
 
 		int HEADER_HEIGHT = 2 * font.lineHeight + BUTTON_HEIGHT + 4 * PADDING;
 		layout = new HeaderAndFooterLayout(this, HEADER_HEIGHT, FOOTER_HEIGHT);
@@ -202,7 +210,7 @@ public class ListCommandGui extends Screen
 		dimensionLabel.setX(Utils.centerIn(xOffset, editBoxWidths[0], dimensionLabel.getWidth()));
 		xOffset += editBoxWidths[0] + PADDING;
 		locationLabel.setX(Utils.centerIn(xOffset, editBoxWidths[1], locationLabel.getWidth()));
-		xOffset += editBoxWidths[1] + GOTO_BUTTON_SIZE + addressItemsWidth + 2 * PADDING;
+		xOffset += editBoxWidths[1] + IMAGE_BUTTON_SIZE + addressItemsWidth + 2 * PADDING;
 		addressLabel.setX(Utils.centerIn(xOffset, editBoxWidths[2], addressLabel.getWidth()));
 		xOffset += editBoxWidths[2] + PADDING;
 		powerLabel.setX(Utils.centerIn(xOffset, editBoxWidths[3], powerLabel.getWidth()));
@@ -211,7 +219,7 @@ public class ListCommandGui extends Screen
 	@Environment(EnvType.CLIENT)
 	public class PortalList extends ContainerObjectSelectionList<PortalList.Entry>
 	{
-		public static final int LEFT_RIGHT_BORDER = 20;
+		private static final int LEFT_RIGHT_BORDER = 20;
 		private final List<PortalInfo> portals;
 
 		public PortalList(List<PortalInfo> portals, Filter filter, Minecraft mc, int width, int height, int top, int itemHeight)
@@ -220,6 +228,27 @@ public class ListCommandGui extends Screen
 
 			this.portals = portals;
 			updateEntries(filter);
+		}
+
+		@Override
+		protected void extractTooltipForNextRenderPass(GuiGraphicsExtractor graphics, int mouseX, int mouseY)
+		{
+			super.extractTooltipForNextRenderPass(graphics, mouseX, mouseY);
+
+			String tooltip;
+
+			for (PortalList.Entry entry : this.children())
+			{
+				tooltip = entry.getTooltip();
+
+				if (tooltip != null && !tooltip.isEmpty())
+				{
+					List<Component> comment = Arrays.stream(tooltip.split("\n")).map(Component::translatable).collect(Collectors.toList());
+					graphics.setComponentTooltipForNextFrame(font, comment, mouseX, mouseY);
+
+					break;
+				}
+			}
 		}
 
 		public void updateEntries(Filter filter)
@@ -285,7 +314,7 @@ public class ListCommandGui extends Screen
 			int[] editBoxWidths = new int[4];
 
 			int addressItemsWidth = 4 * ADDRESS_ITEM_SIZE;
-			int totalBoxesWidth = rowWidth - addressItemsWidth - (GOTO_BUTTON_SIZE + PADDING);
+			int totalBoxesWidth = rowWidth - addressItemsWidth - ((IMAGE_BUTTON_SIZE * 4) + (4 * PADDING));
 			float onePercentOfTotalBoxesWidth = totalBoxesWidth / 100f;
 			editBoxWidths[0] = (int)Math.floor(onePercentOfTotalBoxesWidth * 25);	// dimension
 			editBoxWidths[1] = (int)Math.floor(onePercentOfTotalBoxesWidth * 25);	// location
@@ -298,14 +327,24 @@ public class ListCommandGui extends Screen
 		@Environment(EnvType.CLIENT)
 		public class Entry extends ContainerObjectSelectionList.Entry<PortalList.Entry>
 		{
+			private static final String I18N_GOTO_LOCATION = "config.goto_portal";
+			private static final String I18N_ADD_POWER = "config.add_power";
+			private static final String I18N_REMOVE_POWER = "config.remove_power";
+			private static final String I18N_DEACTIVATE = "config.deactivate";
+
 			private final EditBox dimensionBox;
 			private final EditBox locationBox;
 			private final ImageButton gotoLocationButton;
 			private final EditBox addressBox;
 			private final EditBox powerBox;
+			private final ImageButton addPowerButton;
+			private final ImageButton removePowerButton;
+			private final ImageButton deactivateButton;
 			private final List<ItemStack> addressItems = new ArrayList<>(4);
+			private final List<Identifier> addressIds = new ArrayList<>(4);
 			private final FormattedCharSequence[] addressBlockCountLabels = new FormattedCharSequence[4];
 			private final int[] addressBlockCountLabelWidths = new int[4];
+			private String tooltipText;
 
 			public Entry(PortalInfo portal)
 			{
@@ -321,7 +360,7 @@ public class ListCommandGui extends Screen
 				locationBox.setEditable(false);
 				locationBox.moveCursorToStart(false);
 
-				gotoLocationButton = new ImageButton(0, 0, GOTO_BUTTON_SIZE, GOTO_BUTTON_SIZE, new WidgetSprites(Utils.createModIdentifier("teleport"), Utils.createModIdentifier("teleport_highlighted")), button -> {
+				gotoLocationButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(Utils.createModIdentifier("teleport"), Utils.createModIdentifier("teleport_highlighted")), button -> {
 					minecraft.gui.setScreen(null);
 					ClientPlayNetworking.send(new SimplePortals.TpdCommandPayload(portal.dimension().identifier(), portal.location()));
 				});
@@ -334,9 +373,11 @@ public class ListCommandGui extends Screen
 					addressBlockCountLabelWidths[i] = font.width(addressBlockCountLabels[i]);
 					i++;
 
-					Block addressBlock = BuiltInRegistries.BLOCK.getValue(Identifier.parse(addressComponent.getKey()));
+					Identifier blockId = Identifier.parse(addressComponent.getKey());
+					Block addressBlock = BuiltInRegistries.BLOCK.getValue(blockId);
 					ItemStack addressBlockItem = new ItemStack(addressBlock, 1);
 					addressItems.add(addressBlockItem);
+					addressIds.add(blockId);
 				}
 
 				addressBox = new EditBox(minecraft.font, 0, 0, 100, defaultEntryHeight - PADDING, CommonComponents.EMPTY);
@@ -350,18 +391,32 @@ public class ListCommandGui extends Screen
 				powerBox.setValue(Integer.toString(portal.power()));
 				powerBox.setEditable(false);
 				powerBox.moveCursorToStart(false);
-			}
 
-			@Override
-			public List<? extends NarratableEntry> narratables()
-			{
-				return ImmutableList.of();
-			}
+				addPowerButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(Utils.createModIdentifier("add_power_button"), Utils.createModIdentifier("add_power_button_highlighted")), button -> {
+					BlockPos portalPos = portal.location();
+					ClientPacketListener connection = Minecraft.getInstance().getConnection();
+					connection.sendCommand(String.format("sportals power add %d %d %d %d %s", Settings.powerCapacity(), portalPos.getX(), portalPos.getY(), portalPos.getZ(), portal.dimension().identifier()));
+					minecraft.gui.setScreen(null);
+					connection.sendCommand("sportals list");
+				});
 
-			@Override
-			public List<? extends GuiEventListener> children()
-			{
-				return ImmutableList.of(dimensionBox, locationBox, gotoLocationButton, addressBox, powerBox);
+				removePowerButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(Utils.createModIdentifier("remove_power_button"), Utils.createModIdentifier("remove_power_button_highlighted")), button -> {
+					BlockPos portalPos = portal.location();
+					ClientPacketListener connection = Minecraft.getInstance().getConnection();
+					connection.sendCommand(String.format("sportals power remove %d %d %d %d %s", Settings.powerCapacity(), portalPos.getX(), portalPos.getY(), portalPos.getZ(), portal.dimension().identifier()));
+					minecraft.gui.setScreen(null);
+					connection.sendCommand("sportals list");
+				});
+
+				deactivateButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(Utils.createModIdentifier("deactivate_button"), Utils.createModIdentifier("deactivate_button_highlighted")), button -> {
+					BlockPos portalPos = portal.location();
+					ClientPacketListener connection = Minecraft.getInstance().getConnection();
+					connection.sendCommand(String.format("sportals deactivate %d %d %d %s", portalPos.getX(), portalPos.getY(), portalPos.getZ(), portal.dimension().identifier()));
+					minecraft.gui.setScreen(null);
+					connection.sendCommand("sportals list");
+				});
+
+				tooltipText = null;
 			}
 
 			@Override
@@ -376,31 +431,38 @@ public class ListCommandGui extends Screen
 
 				int xOffset = getContentX();
 
-				dimensionBox.setX(xOffset);
-				dimensionBox.setY(getContentY());
+				dimensionBox.setPosition(xOffset, getContentY());
 				dimensionBox.setWidth(dimensionBoxWidth);
 				dimensionBox.extractRenderState(graphics, mouseX, mouseY, a);
 
 				xOffset += dimensionBoxWidth + PADDING;
 
-				locationBox.setX(xOffset);
-				locationBox.setY(getContentY());
+				locationBox.setPosition(xOffset, getContentY());
 				locationBox.setWidth(locationBoxWidth);
 				locationBox.extractRenderState(graphics, mouseX, mouseY, a);
 
 				xOffset += locationBoxWidth + PADDING;
 
-				gotoLocationButton.setX(xOffset);
-				gotoLocationButton.setY(getContentY());
+				gotoLocationButton.setPosition(xOffset, getContentY());
 				gotoLocationButton.extractRenderState(graphics, mouseX, mouseY, a);
 
-				xOffset += GOTO_BUTTON_SIZE + PADDING;
+				xOffset += IMAGE_BUTTON_SIZE + PADDING;
+				boolean tooltipSet = false;
 
 				for (int i = 0; i < addressItems.size(); i++)
 				{
 					ItemStack item = addressItems.get(i);
 					graphics.item(item, xOffset, getContentY());
 					graphics.text(minecraft.font, addressBlockCountLabels[i], Utils.centerIn(xOffset, ADDRESS_ITEM_SIZE, addressBlockCountLabelWidths[i]), getContentY() + ADDRESS_ITEM_SIZE - 3, -1);
+
+					if ((mouseX >= xOffset) &&
+						(mouseX < (xOffset + ADDRESS_ITEM_SIZE)) &&
+						(mouseY >= getContentY()) &&
+						(mouseY < (getContentY() + ADDRESS_ITEM_SIZE)))
+					{
+						tooltipText = addressIds.get(i).toString();
+						tooltipSet = true;
+					}
 
 					xOffset += ADDRESS_ITEM_SIZE;
 				}
@@ -409,17 +471,82 @@ public class ListCommandGui extends Screen
 				xOffset += (4 - addressItems.size()) * (ADDRESS_ITEM_SIZE);
 				xOffset += PADDING;
 
-				addressBox.setX(xOffset);
-				addressBox.setY(getContentY());
+				addressBox.setPosition(xOffset, getContentY());
 				addressBox.setWidth(addressBoxWidth);
 				addressBox.extractRenderState(graphics, mouseX, mouseY, a);
 
 				xOffset += addressBoxWidth + PADDING;
 
-				powerBox.setX(xOffset);
-				powerBox.setY(getContentY());
+				powerBox.setPosition(xOffset, getContentY());
 				powerBox.setWidth(powerBoxWidth);
 				powerBox.extractRenderState(graphics, mouseX, mouseY, a);
+
+				xOffset += powerBoxWidth + PADDING;
+
+				addPowerButton.setPosition(xOffset, getContentY());
+				addPowerButton.extractRenderState(graphics, mouseX, mouseY, a);
+
+				xOffset += addPowerButton.getWidth() + PADDING;
+
+				removePowerButton.setPosition(xOffset, getContentY());
+				removePowerButton.extractRenderState(graphics, mouseX, mouseY, a);
+
+				xOffset += removePowerButton.getWidth() + PADDING;
+
+				deactivateButton.setPosition(xOffset, getContentY());
+				deactivateButton.extractRenderState(graphics, mouseX, mouseY, a);
+
+				if (!tooltipSet)
+				{
+					Language I18N = Language.getInstance();
+
+					if (mouseIsInsideWidgetsBounds(gotoLocationButton, mouseX, mouseY))
+					{
+						tooltipText = I18N.getOrDefault(I18N_GOTO_LOCATION);
+					}
+					else if (mouseIsInsideWidgetsBounds(addPowerButton, mouseX, mouseY))
+					{
+						tooltipText = I18N.getOrDefault(I18N_ADD_POWER);
+
+					}
+					else if (mouseIsInsideWidgetsBounds(removePowerButton, mouseX, mouseY))
+					{
+						tooltipText = I18N.getOrDefault(I18N_REMOVE_POWER);
+					}
+					else if (mouseIsInsideWidgetsBounds(deactivateButton, mouseX, mouseY))
+					{
+						tooltipText = I18N.getOrDefault(I18N_DEACTIVATE);
+					}
+					else
+					{
+						tooltipText = null;
+					}
+				}
+			}
+
+			public String getTooltip()
+			{
+				return tooltipText;
+			}
+
+			private static boolean mouseIsInsideWidgetsBounds(AbstractWidget widget, int mouseX, int mouseY)
+			{
+				return ((mouseX >= widget.getX()) &&
+						(mouseX <  widget.getRight()) &&
+						(mouseY >= widget.getY()) &&
+						(mouseY <  widget.getBottom()));
+			}
+
+			@Override
+			public List<? extends NarratableEntry> narratables()
+			{
+				return ImmutableList.of();
+			}
+
+			@Override
+			public List<? extends GuiEventListener> children()
+			{
+				return ImmutableList.of(dimensionBox, locationBox, gotoLocationButton, addressBox, powerBox, addPowerButton, removePowerButton, deactivateButton);
 			}
 		}
 	}
