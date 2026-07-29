@@ -68,6 +68,7 @@ public class ConfigSetting
 	public String stringify() { return (stringifier.isPresent()) ? stringifier.get().apply(value) : ""; }
 	public String stringifyDefaultValue() { return (stringifier.isPresent()) ? stringifier.get().apply(defaultValue) : ""; }
 	public Object destringify(String text) { return (destringifier.isPresent()) ? destringifier.get().apply(text) : null; }
+	public ConfigSetting copy() { return new ConfigSetting(id, valueType, value, defaultValue, validator, stringifier, destringifier, description, descriptionKey, category, needsWorldRestart, permissionLvl, clientOnly); }
 
 	public enum Type
 	{

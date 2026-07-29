@@ -17,6 +17,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.locale.Language;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
@@ -91,6 +92,8 @@ public class SimplePortals implements ModInitializer
 	// portal registry
 	public static PortalRegistry portalRegistry;
 
+	public static boolean onDedicatedServer;
+
 	@Override
 	public void onInitialize()
 	{
@@ -142,11 +145,12 @@ public class SimplePortals implements ModInitializer
 		});
 
 		ServerLifecycleEvents.SERVER_STARTED.register((server) -> {
+			onDedicatedServer = server.isDedicatedServer();
 			// Load or create config file. Doing this at the start of onInitialize() would be preferable, but that leads to the validator of Settings.powerSource() failing.
 			// This happens because registries are not fully set up at that time, which the validator queries.
 			Config.reset();
 			Settings.init();
-			Config.loadOrCreateConfigFile(MOD_ID);
+			Config.loadOrCreateConfigFile(MOD_ID, onDedicatedServer);
 		});
 
 		// Necessary for dismantling blocks with the portal activator on sneak right-click.
@@ -178,15 +182,15 @@ public class SimplePortals implements ModInitializer
 				case GetServerSettings ->
 				{
 					List<Config.ConfigValue> configValues = new ArrayList<>();
-					Config.writeServerSettings(configValues, player);
-					ConfigCommandPayload outgoingPayload = new ConfigCommandPayload(ConfigCommandMode.GetServerSettings, configValues);
+					Config.writeServerSettings(false, configValues, player);
+					ConfigCommandPayload outgoingPayload = new ConfigCommandPayload(ConfigCommandMode.GetServerSettings, configValues, onDedicatedServer);
 
 					ServerPlayNetworking.send(player, outgoingPayload);
 				}
 				case SetServerSettings ->
 				{
-					Config.readServerSettings(payload.values, player);
-					Config.save(MOD_ID);
+					Config.readServerSettings(false, payload.values, player);
+					Config.save(MOD_ID, true);
 				}
 			}
 		});
@@ -310,13 +314,14 @@ public class SimplePortals implements ModInitializer
 		}
 	}
 
-	public record ConfigCommandPayload(ConfigCommandMode mode, List<Config.ConfigValue> values) implements CustomPacketPayload
+	public record ConfigCommandPayload(ConfigCommandMode mode, List<Config.ConfigValue> values, boolean fromDedicatedServer) implements CustomPacketPayload
 	{
 		public static final Identifier ID = Utils.createModIdentifier("config_command");
 		public static final CustomPacketPayload.Type<ConfigCommandPayload> TYPE = new CustomPacketPayload.Type<>(ID);
 		public static final StreamCodec<FriendlyByteBuf, ConfigCommandPayload> CODEC = StreamCodec.composite(
 				ConfigCommandMode.STREAM_CODEC, ConfigCommandPayload::mode,
 				Config.LIST_STREAM_CODEC, ConfigCommandPayload::values,
+				ByteBufCodecs.BOOL, ConfigCommandPayload::fromDedicatedServer,
 				ConfigCommandPayload::new
 		);
 

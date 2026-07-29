@@ -17,11 +17,11 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
 
-// TODO: Think about separating client and server settings, and what to do with ConfigSetting.clientOnly. Currently server settings bleed into the local config file.
 public class Config
 {
 	private static final Logger LOG = LogManager.getLogger("simpleconfig");
 	private static final Map<Identifier, ConfigSetting> registry = new HashMap<>();
+	private static final Map<Identifier, ConfigSetting> serverRegistry = new HashMap<>();
 	private static final String DEFAULT_CATEGORY = "";
 
 	public static final String CATEGORY_I18N_PREFIX = "config.";
@@ -35,15 +35,12 @@ public class Config
 		return true;
 	}
 
-	public static List<ConfigSetting> getSettings(List<ConfigValue> values)
+	public static List<ConfigSetting> getMergedSettings()
 	{
-		List<ConfigSetting> settings = new ArrayList<>(values.size());
+		List<ConfigSetting> settings = new ArrayList<>(registry.size());
 
-		for (var value : values)
-		{
-			var setting = getSetting(value.id);
-			if (setting.isPresent()) settings.add(setting.get());
-		}
+		registry.values().stream().filter(setting -> setting.clientOnly).forEach(settings::add);
+		settings.addAll(serverRegistry.values());
 
 		return settings;
 	}
@@ -74,6 +71,7 @@ public class Config
 		try
 		{
 			registry.put(id, setting);
+			if (!setting.clientOnly) serverRegistry.put(id, setting.copy());
 		}
 		catch (Exception _)
 		{
@@ -152,6 +150,7 @@ public class Config
 		try
 		{
 			registry.put(id, setting);
+			if (!setting.clientOnly) serverRegistry.put(id, setting.copy());
 		}
 		catch (Exception _)
 		{
@@ -230,6 +229,7 @@ public class Config
 		try
 		{
 			registry.put(id, setting);
+			if (!setting.clientOnly) serverRegistry.put(id, setting.copy());
 		}
 		catch (Exception _)
 		{
@@ -308,6 +308,7 @@ public class Config
 		try
 		{
 			registry.put(id, setting);
+			if (!setting.clientOnly) serverRegistry.put(id, setting.copy());
 		}
 		catch (Exception _)
 		{
@@ -385,8 +386,11 @@ public class Config
 
 		try
 		{
+			// Complex types without stringifier or destringifier cause an exception.
 			var setting = new ConfigSetting(id, ConfigSetting.Type.Complex, defaultValue, defaultValue, validator, stringifier, destringifier, description, descriptionKey, category, needsWorldRestart, permissionLvl, clientOnly);
+
 			registry.put(id, setting);
+			if (!setting.clientOnly) serverRegistry.put(id, setting.copy());
 		}
 		catch (Exception _)
 		{
@@ -455,7 +459,7 @@ public class Config
 		return addComplex(id, defaultValue, Optional.empty(), Optional.of(stringifier), Optional.of(destringifier), description, id.getPath(), DEFAULT_CATEGORY, needsWorldRestart, permissionLvl, clientOnly);
 	}
 
-	public static void loadOrCreateConfigFile(String configName)
+	public static void loadOrCreateConfigFile(String configName, boolean skipClientOnly)
 	{
 		File configFile = getConfigPath(configName);
 		if (configFile == null) return;
@@ -464,21 +468,26 @@ public class Config
 
 		if (configFile.exists())
 		{
-			loadConfigFromFile(configFilePath);
+			loadConfigFromFile(configFilePath, skipClientOnly);
 		}
 		else
 		{
-			createConfigFile(configFilePath, true);
+			createConfigFile(configFilePath, true, skipClientOnly);
 		}
 	}
 
 	public static void save(String configName)
 	{
+		save(configName, false);
+	}
+
+	public static void save(String configName, boolean skipClientOnly)
+	{
 		File configFile = getConfigPath(configName);
 		if (configFile == null) return;
 
 		Path configFilePath = Paths.get(configFile.toURI());
-		createConfigFile(configFilePath, false);
+		createConfigFile(configFilePath, false, skipClientOnly);
 	}
 
 	private static File getConfigPath(String configName)
@@ -509,13 +518,15 @@ public class Config
 		return new File(configDir, configName + ".cfg");
 	}
 
-	private static void createConfigFile(Path file, boolean initToDefaults)
+	private static void createConfigFile(Path file, boolean initToDefaults, boolean skipClientOnly)
 	{
 		StringBuilder builder = new StringBuilder();
 
 		for (var entry : registry.entrySet())
 		{
 			var configValue = entry.getValue();
+
+			if (skipClientOnly && configValue.clientOnly) continue;	// No need to write clientOnly settings into config file on the dedicated server.
 			if (initToDefaults) configValue.setDefaultValue();
 
 			appendConfigValue(entry.getKey(), configValue, builder);
@@ -558,7 +569,11 @@ public class Config
 	}
 
 
-	private static void loadConfigFromFile(Path file)
+	// The skipClientOnlyOnWritingConfigFile flag might be confusing at first glance. If not all settings
+	// are found when parsing a config file, the config file gets rewritten with the parsed settings and
+	// default values for those that were missing. Because clientOnly settings are not stored in the config
+	// file on dedicated servers, the flag needs to be carried through here!
+	private static void loadConfigFromFile(Path file, boolean skipClientOnlyOnWritingConfigFile)
 	{
 		List<String> lines;
 
@@ -624,19 +639,22 @@ public class Config
 
 		// Rewrite the config file if there were settings missing during loading.
 		// One possible reason for this happening is an old config file.
-		if (parseError || parsedSettingsCount != registry.size()) createConfigFile(file, false);
+		if (parseError || parsedSettingsCount != registry.size()) createConfigFile(file, false, skipClientOnlyOnWritingConfigFile);
 	}
+
 	/**
 	 *
 	 * Writes the values of all non client-only settings, the player has the appropriate permission lvl for, into the passed in list.
-	 * This is used for changing settings on a dedicated server remotely.
+	 * This is used for changing settings on a server remotely.
 	 */
-	public static void writeServerSettings(List<ConfigValue> configValues, Player player)
+	public static void writeServerSettings(boolean toRemoteServer, List<ConfigValue> configValues, Player player)
 	{
-		for (var registryEntry : registry.entrySet())
+		var activeRegistry = (toRemoteServer) ? serverRegistry : registry;
+
+		for (var registryEntry : activeRegistry.entrySet())
 		{
-			var configSetting = registryEntry.getValue();
 			var id = registryEntry.getKey();
+			var configSetting = registryEntry.getValue();
 
 			var requiredPermissionLevel = PermissionLevel.byId(configSetting.permissionLvl);
 			var requiredPermission = new Permission.HasCommandLevel(requiredPermissionLevel);
@@ -650,22 +668,28 @@ public class Config
 
 	/**
 	 * Reads the values of all non client-only settings, the player has the appropriate permission lvl for, from the passed in list.
-	 * It is assumed that the buffer was filled by calling {@link Config#writeServerSettings(List, Player)} and that the players
-	 * permissions did not change between both calls.
-	 * This is used for changing settings on a dedicated server remotely.
+	 * It is assumed that the buffer was filled by calling {@link Config#writeServerSettings(boolean, List, Player)} and that the players
+	 * permissions did not change between both calls. Those settings are stored in a separate server-only registry.
+	 * This is used for changing settings on a server remotely.
 	 */
-	public static void readServerSettings(List<ConfigValue> configValues, Player player)
+	public static void readServerSettings(boolean fromRemoteServer, List<ConfigValue> configValues, Player player)
 	{
+		// Keep received server settings in a different registry in order to separate them from local settings, in case the player
+		// decides to play singleplayer with the same client install. Otherwise, the server settings will get written into the local
+		// config file, possibly changing those for local play in an undesired ways. This is only relevant while being connected
+		// either to a dedicated server or an integrated one, that is not the players machine, that has been opened for LAN.
+		var activeRegistry = (fromRemoteServer) ? serverRegistry : registry;
+
 		for (var configValue : configValues)
 		{
-			if (!registry.containsKey(configValue.id)) continue;
+			if (!activeRegistry.containsKey(configValue.id)) continue;
 
-			var setting = registry.get(configValue.id);
+			var setting = activeRegistry.get(configValue.id);
 			var requiredPermissionLevel = PermissionLevel.byId(setting.permissionLvl);
 			var requiredPermission = new Permission.HasCommandLevel(requiredPermissionLevel);
 
 			//:BROKEN_PERMISSIONS
-			if (setting.clientOnly || (setting.permissionLvl > 0 && !player.permissions().hasPermission(requiredPermission))) continue;
+			if (setting.permissionLvl > 0 && !player.permissions().hasPermission(requiredPermission)) continue;
 
 			setting.value = configValue.value;
 
