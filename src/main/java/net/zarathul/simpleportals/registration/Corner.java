@@ -4,7 +4,6 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.nbt.CompoundTag;
 
 /**
  * Represents a corner of a portal.
@@ -30,44 +29,13 @@ public record Corner(BlockPos pos, Direction facingA, Direction facingB)
 				? pos.offset(facingA.getUnitVec3i()).offset(facingB.getUnitVec3i())
 				: null;
 	}
-	
-//	public CompoundTag serializeNBT()
-//	{
-//		CompoundTag tag = new CompoundTag();
-//		tag.putLong("pos", pos.asLong());
-//		tag.putString("facingA", facingA.getSerializedName());
-//		tag.putString("facingB", facingB.getSerializedName());
-//
-//		return tag;
-//	}
-//
-//	public void deserializeNBT(CompoundTag nbt)
-//	{
-//		if (nbt == null) return;
-//
-//		pos = BlockPos.of(nbt.getLong("pos").get());
-//
-//		facingA = Direction.byName(nbt.getString("facingA").get());
-//		facingB = Direction.byName(nbt.getString("facingB").get());
-//	}
-	
+
 	@Override
 	public String toString()
 	{
 		return pos + " : " + facingA + " / " + facingB;
 	}
 	
-//	@Override
-//	public int hashCode()
-//	{
-//		final int prime = 31;
-//		int result = 1;
-//		result = prime * result + ((facingA == null) ? 0 : facingA.hashCode());
-//		result = prime * result + ((facingB == null) ? 0 : facingB.hashCode());
-//		result = prime * result + ((pos == null) ? 0 : pos.hashCode());
-//		return result;
-//	}
-//
 	@Override
 	public boolean equals(Object obj)
 	{

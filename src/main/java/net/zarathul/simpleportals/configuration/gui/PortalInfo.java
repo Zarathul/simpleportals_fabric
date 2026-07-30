@@ -1,15 +1,12 @@
 package net.zarathul.simpleportals.configuration.gui;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import net.zarathul.simpleportals.registration.Address;
-import net.zarathul.simpleportals.registration.Portal;
-import net.zarathul.simpleportals.registration.PortalRegistry;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -71,11 +68,3 @@ public record PortalInfo(
 		}
 	};
 }
-
-//public class PortalInfo
-//{
-//	public ResourceKey<Level> dimension;
-//	public BlockPos location;
-//	public Address address;
-//	public int power;
-//}

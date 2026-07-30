@@ -10,7 +10,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.zarathul.simpleportals.Settings;
 import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.registration.Portal;
-import net.zarathul.simpleportals.registration.PortalRegistry;
 
 import java.util.List;
 

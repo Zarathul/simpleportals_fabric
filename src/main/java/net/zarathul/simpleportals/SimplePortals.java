@@ -53,6 +53,7 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class SimplePortals implements ModInitializer
 {
@@ -111,12 +112,8 @@ public class SimplePortals implements ModInitializer
 		// Register creative tab.
 		Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, CREATIVE_MODE_TAB_ID, creativeTab);
 
-		// Register custom network payloads.
-		PayloadTypeRegistry.serverboundPlay().register(ListCommandPayload.TYPE, ListCommandPayload.CODEC);
-		PayloadTypeRegistry.clientboundPlay().register(ListCommandPayload.TYPE, ListCommandPayload.CODEC);
-		PayloadTypeRegistry.serverboundPlay().register(ConfigCommandPayload.TYPE, ConfigCommandPayload.CODEC);
-		PayloadTypeRegistry.clientboundPlay().register(ConfigCommandPayload.TYPE, ConfigCommandPayload.CODEC);
-		PayloadTypeRegistry.serverboundPlay().register(TpdCommandPayload.TYPE, TpdCommandPayload.CODEC);
+		// Register packet handlers.
+		registerCustomPackerHandlers();
 
 		// Register Commands.
 		CommandRegistrationCallback.EVENT.register((dispatcher, buildContext, selection) -> {
@@ -168,6 +165,20 @@ public class SimplePortals implements ModInitializer
 
 			return InteractionResult.PASS;
 		});
+
+	}
+
+	private static void registerCustomPackerHandlers()
+	{
+		// Register custom network payloads.
+		PayloadTypeRegistry.serverboundPlay().register(ConfigCommandPayload.TYPE, ConfigCommandPayload.CODEC);
+		PayloadTypeRegistry.clientboundPlay().register(ConfigCommandPayload.TYPE, ConfigCommandPayload.CODEC);
+
+		PayloadTypeRegistry.serverboundPlay().register(TpdCommandPayload.TYPE, TpdCommandPayload.CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(SetPortalPowerPayload.TYPE, SetPortalPowerPayload.CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(DeactivatePortalPayload.TYPE, DeactivatePortalPayload.CODEC);
+
+		PayloadTypeRegistry.clientboundPlay().register(ListCommandPayload.TYPE, ListCommandPayload.CODEC);
 
 		// Server side receiver for the config command. Stores the received settings in the config of the server,
 		// assuming the player has the required permissions.
@@ -230,6 +241,66 @@ public class SimplePortals implements ModInitializer
 				false
 			);
 		});
+
+		ServerPlayNetworking.registerGlobalReceiver(SetPortalPowerPayload.TYPE, (payload, ctx) -> {
+			var player = ctx.player();
+			var I18N = Language.getInstance();
+
+			if (!player.permissions().hasPermission(Permissions.COMMANDS_OWNER))
+			{
+				player.sendSystemMessage(Component.translatable("missing_permission"));
+				return;
+			}
+
+			ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, payload.dimension);
+			BlockPos location = payload.location;
+			List<Portal> portals = portalRegistry.getPortalsAt(location, dimension);
+
+			if (portals.isEmpty())
+			{
+				var localizedMessage = String.format(I18N.getOrDefault("portal_missing"), dimension.identifier(), location);
+				player.sendSystemMessage(Component.literal(localizedMessage));
+				return;
+			}
+
+			Portal targetPortal = portals.getFirst();
+			portalRegistry.setPower(targetPortal, payload.value);
+			ListCommandPayload.send(player);
+		});
+
+		ServerPlayNetworking.registerGlobalReceiver(DeactivatePortalPayload.TYPE, (payload, ctx) -> {
+			var player = ctx.player();
+			var I18N = Language.getInstance();
+
+			if (!player.permissions().hasPermission(Permissions.COMMANDS_OWNER))
+			{
+				player.sendSystemMessage(Component.translatable("missing_permission"));
+				return;
+			}
+
+			ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, payload.dimension);
+			BlockPos location = payload.location;
+			ServerLevel destinationLevel = ctx.server().getLevel(dimension);
+
+			if (destinationLevel == null)
+			{
+				var localizedMessage = String.format(I18N.getOrDefault("dimension_missing"), dimension.identifier());
+				player.sendSystemMessage(Component.literal(localizedMessage));
+				return;
+			}
+
+			List<Portal> portals = portalRegistry.getPortalsAt(location, dimension);
+
+			if (portals.isEmpty())
+			{
+				var localizedMessage = String.format(I18N.getOrDefault("portal_missing"), dimension.identifier(), location);
+				player.sendSystemMessage(Component.literal(localizedMessage));
+				return;
+			}
+
+			portalRegistry.deactivatePortal(destinationLevel, payload.location);
+			ListCommandPayload.send(player);
+		});
 	}
 
 	private static ResourceKey<Block> createBlockKey(String name)
@@ -269,6 +340,51 @@ public class SimplePortals implements ModInitializer
 		{
 			return TYPE;
 		}
+
+		public static void send(ServerPlayer player)
+		{
+			// Generate a PortalInfo for every registered portal.
+			List<PortalInfo> portals = portalRegistry.getAllPortals().stream()
+				.map(portal -> new PortalInfo(
+					portal.dimension(),
+					portal.corner1().pos(),
+					portal.address(),
+					portalRegistry.getPortalPower(portal))
+				)
+				.collect(Collectors.toList());
+
+			SimplePortals.ListCommandPayload outgoingPayload = new SimplePortals.ListCommandPayload(portals);
+			ServerPlayNetworking.send(player, outgoingPayload);
+		}
+	}
+
+	public record SetPortalPowerPayload(Identifier dimension, BlockPos location, int value) implements CustomPacketPayload
+	{
+		public static final Identifier ID = Utils.createModIdentifier("set_portal_power");
+		public static final CustomPacketPayload.Type<SetPortalPowerPayload> TYPE = new CustomPacketPayload.Type<>(ID);
+
+		public static final StreamCodec<FriendlyByteBuf, SetPortalPowerPayload> CODEC = StreamCodec.composite(
+			Identifier.STREAM_CODEC, SetPortalPowerPayload::dimension,
+			BlockPos.STREAM_CODEC, SetPortalPowerPayload::location,
+			ByteBufCodecs.INT, SetPortalPowerPayload::value,
+			SetPortalPowerPayload::new
+		);
+
+		public Type<? extends CustomPacketPayload> type() { return TYPE; }
+	}
+
+	public record DeactivatePortalPayload(Identifier dimension, BlockPos location) implements CustomPacketPayload
+	{
+		public static final Identifier ID = Utils.createModIdentifier("deactivate_portal");
+		public static final CustomPacketPayload.Type<DeactivatePortalPayload> TYPE = new CustomPacketPayload.Type<>(ID);
+
+		public static final StreamCodec<FriendlyByteBuf, DeactivatePortalPayload> CODEC = StreamCodec.composite(
+			Identifier.STREAM_CODEC, DeactivatePortalPayload::dimension,
+			BlockPos.STREAM_CODEC, DeactivatePortalPayload::location,
+			DeactivatePortalPayload::new
+		);
+
+		public Type<? extends CustomPacketPayload> type() { return TYPE; }
 	}
 
 	public record ConfigCommandPayload(List<Config.ConfigValue> values, boolean fromDedicatedServer) implements CustomPacketPayload

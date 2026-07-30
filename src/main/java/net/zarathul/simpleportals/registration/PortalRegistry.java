@@ -403,8 +403,34 @@ public final class PortalRegistry extends SavedData
 	}
 	
 	/**
-	 * Adds the specified amount of power to the specified portal.
+	 * Sets the portals power to the specified {@code value}.<br>
+	 * If {@code value} is higher than the portals capacity, the
+	 * portals power is set to maximum capacity instead.
 	 * 
+	 * @param portal
+	 * The {@link Portal} whose power should be set.
+	 * @param value
+	 * The value to set to.
+	 * @return
+	 * The value the portal power was set to.
+	 */
+	public int setPower(Portal portal, int value)
+	{
+		if (portal == null || value < 0) return -1;
+		
+		int valueToSet = Math.min(Settings.powerCapacity(), value);
+
+		power.put(portal, valueToSet);
+		
+		// Trigger save of portal data
+		setDirty();
+
+		return valueToSet;
+	}
+
+	/**
+	 * Adds the specified amount of power to the specified portal.
+	 *
 	 * @param portal
 	 * The {@link Portal} to which the power should be added.
 	 * @param amount
@@ -415,20 +441,20 @@ public final class PortalRegistry extends SavedData
 	public int addPower(Portal portal, int amount)
 	{
 		if (portal == null || amount < 1) return amount;
-		
+
 		int oldAmount = getPortalPower(portal);
 		int freeCapacity = Math.max(Settings.powerCapacity() - oldAmount, 0);
 		int amountToAdd = Math.min(freeCapacity, amount);
 		int surplus = amount - amountToAdd;
-		
+
 		power.put(portal, oldAmount + amountToAdd);
-		
+
 		// Trigger save of portal data
 		setDirty();
-		
+
 		return surplus;
 	}
-	
+
 	/**
 	 * Removes the specified amount of power from the specified portal.<br>
 	 * Only ever removes power if the portal contains enough. 

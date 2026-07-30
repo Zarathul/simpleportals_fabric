@@ -23,7 +23,6 @@ import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.commands.arguments.BlockArgument;
 import net.zarathul.simpleportals.common.Utils;
 import net.zarathul.simpleportals.configuration.Config;
-import net.zarathul.simpleportals.configuration.gui.PortalInfo;
 import net.zarathul.simpleportals.mixin.EntityAccessor;
 import net.zarathul.simpleportals.registration.Address;
 import net.zarathul.simpleportals.registration.Portal;
@@ -50,6 +49,7 @@ public class CommandPortals
 		Add,
 		Remove,
 		Get,
+		Set,
 		Items
 	}
 
@@ -86,18 +86,7 @@ public class CommandPortals
 						return 0;
 					}
 
-					// Generate a PortalInfo for every registered portal.
-					List<PortalInfo> portals = portalRegistry.getAllPortals().stream()
-						.map(portal -> new PortalInfo(
-							portal.dimension(),
-							portal.corner1().pos(),
-							portal.address(),
-							portalRegistry.getPortalPower(portal))
-						)
-						.collect(Collectors.toList());
-
-					SimplePortals.ListCommandPayload outgoingPayload = new SimplePortals.ListCommandPayload(portals);
-					ServerPlayNetworking.send(player, outgoingPayload);
+					SimplePortals.ListCommandPayload.send(player);
 
 					return 1;
 				})
@@ -192,6 +181,20 @@ public class CommandPortals
 						.then(
 							Commands.argument("dimension", DimensionArgument.dimension())		// sportals power get <x> <y> <z> [dimension]
 							.executes(context -> power(context.getSource(), PowerMode.Get, 0, BlockPosArgument.getLoadedBlockPos(context, "position"), DimensionArgument.getDimension(context, "dimension")))
+						)
+					)
+				)
+				.then(
+					Commands.literal("set")
+					.then(
+						Commands.argument("amount", IntegerArgumentType.integer(0))
+							.then(
+								Commands.argument("position", BlockPosArgument.blockPos())
+								.executes(context -> power(context.getSource(), PowerMode.Set, IntegerArgumentType.getInteger(context, "amount"), BlockPosArgument.getLoadedBlockPos(context, "position"), null))
+								.then(
+									Commands.argument("dimension", DimensionArgument.dimension())		// sportals power set <amount> <x> <y> <z> [dimension]
+									.executes(context -> power(context.getSource(), PowerMode.Set, IntegerArgumentType.getInteger(context, "amount"), BlockPosArgument.getLoadedBlockPos(context, "position"), DimensionArgument.getDimension(context, "dimension")))
+							)
 						)
 					)
 				)
@@ -377,6 +380,12 @@ public class CommandPortals
 				// sportals power get <x> <y> <z> [dimension]
 				amount = portalRegistry.getPortalPower(portal);
 				Utils.SendTranslatedMessage(source, "commands.sportals.power.get.success", pos.getX(), pos.getY(), pos.getZ(), dimension.identifier().toString(), amount);
+				break;
+
+			case Set:
+				// sportals power set <x> <y> <z> [dimension]
+				amount = portalRegistry.setPower(portal, amount);
+				Utils.SendTranslatedMessage(source, "commands.sportals.power.set.success", amount, pos.getX(), pos.getY(), pos.getZ(), dimension.identifier().toString());
 				break;
 		}
 

@@ -2,7 +2,6 @@ package net.zarathul.simpleportals.configuration.gui;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.components.WidgetSprites;
@@ -12,7 +11,6 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.ARGB;
-import net.minecraft.util.Mth;
 
 @Environment(EnvType.CLIENT)
 public class CheckboxButtonEx extends AbstractButton

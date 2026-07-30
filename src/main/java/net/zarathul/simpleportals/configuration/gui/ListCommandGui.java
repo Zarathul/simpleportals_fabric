@@ -12,7 +12,6 @@ import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
 import net.minecraft.client.gui.layouts.LinearLayout;
 import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.locale.Language;
@@ -22,15 +21,16 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
-import net.zarathul.simpleportals.Settings;
 import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.common.Utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
+// TODO: Maybe replace manual ItemStack rendering with ItemDisplayWidget
 
 @Environment(EnvType.CLIENT)
 public class ListCommandGui extends Screen
@@ -40,12 +40,14 @@ public class ListCommandGui extends Screen
 	private CycleButtonEx<Filter.Type> filterTypeButton;
 	private CycleButtonEx<Filter.Condition> filterConditionButton;
 	private EditBox filterValueBox;
-	private StringWidget dimensionLabel;
-	private StringWidget locationLabel;
-	private StringWidget addressLabel;
-	private StringWidget powerLabel;
+	private PlainTextButton dimensionLabel;
+	private PlainTextButton locationLabel;
+	private PlainTextButton addressLabel;
+	private PlainTextButton powerLabel;
 	private final Filter filter;
 	private final HeaderAndFooterLayout layout;
+
+	private SortMode sortMode = new SortMode(SortField.Address, SortDirection.Ascending);
 
 	private static final int PADDING = 5;
 	private static final int BUTTON_HEIGHT = Button.DEFAULT_HEIGHT;
@@ -68,18 +70,16 @@ public class ListCommandGui extends Screen
 
 	public ListCommandGui(List<PortalInfo> portals)
 	{
-		this(portals, Filter.NONE);
+		this(portals, Filter.NONE, new SortMode(SortField.Address, SortDirection.Ascending));
 	}
 
-	public ListCommandGui(List<PortalInfo> portals, Filter filter)
+	public ListCommandGui(List<PortalInfo> portals, Filter filter, SortMode sortMode)
 	{
 		super(Component.translatable("config.portal_list_header"));
 
 		this.portals = portals;
 		this.filter = filter;
-
-		// Sort by address
-		this.portals.sort((o1, o2) -> o1.address().compareTo(o2.address()));
+		this.sortMode = sortMode;
 
 		int HEADER_HEIGHT = 2 * font.lineHeight + BUTTON_HEIGHT + 4 * PADDING;
 		layout = new HeaderAndFooterLayout(this, HEADER_HEIGHT, FOOTER_HEIGHT);
@@ -145,14 +145,20 @@ public class ListCommandGui extends Screen
 		LinearLayout thirdRow = LinearLayout.horizontal();
 		verticalLayout.addChild(thirdRow);
 
-		dimensionLabel = new StringWidget(0, 0, font.width(DIMENSION_HEADER.getVisualOrderText()), 9, DIMENSION_HEADER, font);
+		dimensionLabel = new PlainTextButton(0, 0, font.width(DIMENSION_HEADER.getVisualOrderText()), 9, DIMENSION_HEADER, _ -> onColumnLabelPressed(SortField.Dimension), font);
 		thirdRow.addChild(dimensionLabel);
-		locationLabel = new StringWidget(0, 0, font.width(LOCATION_HEADER.getVisualOrderText()), 9, LOCATION_HEADER, font);
+		locationLabel = new PlainTextButton(0, 0, font.width(LOCATION_HEADER.getVisualOrderText()), 9, LOCATION_HEADER, _ -> onColumnLabelPressed(SortField.Location), font);
 		thirdRow.addChild(locationLabel);
-		addressLabel = new StringWidget(0, 0, font.width(ADDRESS_HEADER.getVisualOrderText()), 9, ADDRESS_HEADER, font);
+		addressLabel = new PlainTextButton(0, 0, font.width(ADDRESS_HEADER.getVisualOrderText()), 9, ADDRESS_HEADER, _ -> onColumnLabelPressed(SortField.Address), font);
 		thirdRow.addChild(addressLabel);
-		powerLabel = new StringWidget(0, 0, font.width(POWER_HEADER.getVisualOrderText()), 9, POWER_HEADER, font);
+		powerLabel = new PlainTextButton(0, 0, font.width(POWER_HEADER.getVisualOrderText()), 9, POWER_HEADER, _ -> onColumnLabelPressed(SortField.Power), font);
 		thirdRow.addChild(powerLabel);
+	}
+
+	private void onColumnLabelPressed(SortField sortField)
+	{
+		sortMode = (sortMode.field == sortField) ? sortMode.invert() : new SortMode(sortField);
+		minecraft.gui.setScreen(new ListCommandGui(portals, filter, sortMode));
 	}
 
 	private void addContents()
@@ -173,7 +179,7 @@ public class ListCommandGui extends Screen
 
 		Filter filter = new Filter(filterTypeButton.getSelectedValue(), filterConditionButton.getSelectedValue(), value);
 		// Trying to modify the screen resulted in all kinds of graphical bugs, so let's just make a new one every time the filter changes.
-		minecraft.gui.setScreen(new ListCommandGui(portals, filter));
+		minecraft.gui.setScreen(new ListCommandGui(portals, filter, sortMode));
 	}
 
 	private <T extends Enum<?>> String stringifyEnumAsTranslatableKey(T component)
@@ -210,7 +216,7 @@ public class ListCommandGui extends Screen
 		dimensionLabel.setX(Utils.centerIn(xOffset, editBoxWidths[0], dimensionLabel.getWidth()));
 		xOffset += editBoxWidths[0] + PADDING;
 		locationLabel.setX(Utils.centerIn(xOffset, editBoxWidths[1], locationLabel.getWidth()));
-		xOffset += editBoxWidths[1] + IMAGE_BUTTON_SIZE + addressItemsWidth + 2 * PADDING;
+		xOffset += editBoxWidths[1] + addressItemsWidth + PADDING;
 		addressLabel.setX(Utils.centerIn(xOffset, editBoxWidths[2], addressLabel.getWidth()));
 		xOffset += editBoxWidths[2] + PADDING;
 		powerLabel.setX(Utils.centerIn(xOffset, editBoxWidths[3], powerLabel.getWidth()));
@@ -254,6 +260,15 @@ public class ListCommandGui extends Screen
 		public void updateEntries(Filter filter)
 		{
 			clearEntries();
+
+			switch (sortMode.field)
+			{
+				// Descending order is achieved by swapping the input parameters to the comparator.
+				case Dimension -> this.portals.sort(Utils.invertComparator(sortMode::isDescending, (o1, o2) -> o1.dimension().identifier().compareTo(o2.dimension().identifier())));
+				case Location -> this.portals.sort(Comparator.<PortalInfo, Identifier>comparing(portalInfo -> portalInfo.dimension().identifier()).thenComparing(Utils.invertComparator(sortMode::isDescending, (o1, o2) -> o1.location().compareTo(o2.location()))));
+				case Address -> this.portals.sort(Utils.invertComparator(sortMode::isDescending, (o1, o2) -> o1.address().compareTo(o2.address())));
+				case Power -> this.portals.sort(Utils.invertComparator(sortMode::isDescending, (o1, o2) -> Integer.compare(o1.power(), o2.power())));
+			}
 
 			switch (filter.type)
 			{
@@ -314,7 +329,7 @@ public class ListCommandGui extends Screen
 			int[] editBoxWidths = new int[4];
 
 			int addressItemsWidth = 4 * ADDRESS_ITEM_SIZE;
-			int totalBoxesWidth = rowWidth - addressItemsWidth - ((IMAGE_BUTTON_SIZE * 4) + (4 * PADDING));
+			int totalBoxesWidth = rowWidth - addressItemsWidth - ((3 * IMAGE_BUTTON_SIZE) + (3 * PADDING));
 			float onePercentOfTotalBoxesWidth = totalBoxesWidth / 100f;
 			editBoxWidths[0] = (int)Math.floor(onePercentOfTotalBoxesWidth * 25);	// dimension
 			editBoxWidths[1] = (int)Math.floor(onePercentOfTotalBoxesWidth * 25);	// location
@@ -327,18 +342,16 @@ public class ListCommandGui extends Screen
 		@Environment(EnvType.CLIENT)
 		public class Entry extends ContainerObjectSelectionList.Entry<PortalList.Entry>
 		{
-			private static final String I18N_GOTO_LOCATION = "config.goto_portal";
-			private static final String I18N_ADD_POWER = "config.add_power";
-			private static final String I18N_REMOVE_POWER = "config.remove_power";
-			private static final String I18N_DEACTIVATE = "config.deactivate";
+			private static final String I18N_GOTO_LOCATION_TOOLTIP = "config.goto_portal.tooltip";
+			private static final String I18N_SET_POWER_TOOLTIP = "config.set_power.tooltip";
+			private static final String I18N_DEACTIVATE_TOOLTIP = "config.deactivate.tooltip";
 
 			private final EditBox dimensionBox;
 			private final EditBox locationBox;
 			private final ImageButton gotoLocationButton;
 			private final EditBox addressBox;
 			private final EditBox powerBox;
-			private final ImageButton addPowerButton;
-			private final ImageButton removePowerButton;
+			private final ImageButton setPowerButton;
 			private final ImageButton deactivateButton;
 			private final List<ItemStack> addressItems = new ArrayList<>(4);
 			private final List<Identifier> addressIds = new ArrayList<>(4);
@@ -389,31 +402,19 @@ public class ListCommandGui extends Screen
 				powerBox = new EditBox(minecraft.font, 0, 0, 100, defaultEntryHeight - PADDING, CommonComponents.EMPTY);
 				powerBox.setMaxLength(10);
 				powerBox.setValue(Integer.toString(portal.power()));
-				powerBox.setEditable(false);
 				powerBox.moveCursorToStart(false);
 
-				addPowerButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(Utils.createModIdentifier("add_power_button"), Utils.createModIdentifier("add_power_button_highlighted")), button -> {
-					BlockPos portalPos = portal.location();
-					ClientPacketListener connection = Minecraft.getInstance().getConnection();
-					connection.sendCommand(String.format("sportals power add %d %d %d %d %s", Settings.powerCapacity(), portalPos.getX(), portalPos.getY(), portalPos.getZ(), portal.dimension().identifier()));
-					minecraft.gui.setScreen(null);
-					connection.sendCommand("sportals list");
-				});
-
-				removePowerButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(Utils.createModIdentifier("remove_power_button"), Utils.createModIdentifier("remove_power_button_highlighted")), button -> {
-					BlockPos portalPos = portal.location();
-					ClientPacketListener connection = Minecraft.getInstance().getConnection();
-					connection.sendCommand(String.format("sportals power remove %d %d %d %d %s", Settings.powerCapacity(), portalPos.getX(), portalPos.getY(), portalPos.getZ(), portal.dimension().identifier()));
-					minecraft.gui.setScreen(null);
-					connection.sendCommand("sportals list");
+				setPowerButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(Utils.createModIdentifier("set_power_button"), Utils.createModIdentifier("set_power_button_highlighted")), button -> {
+					try
+					{
+						int power = Integer.parseInt(powerBox.getValue());
+						ClientPlayNetworking.send(new SimplePortals.SetPortalPowerPayload(portal.dimension().identifier(), portal.location(), power));
+					}
+					catch (NumberFormatException _) {}
 				});
 
 				deactivateButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(Utils.createModIdentifier("deactivate_button"), Utils.createModIdentifier("deactivate_button_highlighted")), button -> {
-					BlockPos portalPos = portal.location();
-					ClientPacketListener connection = Minecraft.getInstance().getConnection();
-					connection.sendCommand(String.format("sportals deactivate %d %d %d %s", portalPos.getX(), portalPos.getY(), portalPos.getZ(), portal.dimension().identifier()));
-					minecraft.gui.setScreen(null);
-					connection.sendCommand("sportals list");
+					ClientPlayNetworking.send(new SimplePortals.DeactivatePortalPayload(portal.dimension().identifier(), portal.location()));
 				});
 
 				tooltipText = null;
@@ -443,10 +444,6 @@ public class ListCommandGui extends Screen
 
 				xOffset += locationBoxWidth + PADDING;
 
-				gotoLocationButton.setPosition(xOffset, getContentY());
-				gotoLocationButton.extractRenderState(graphics, mouseX, mouseY, a);
-
-				xOffset += IMAGE_BUTTON_SIZE + PADDING;
 				boolean tooltipSet = false;
 
 				for (int i = 0; i < addressItems.size(); i++)
@@ -483,15 +480,15 @@ public class ListCommandGui extends Screen
 
 				xOffset += powerBoxWidth + PADDING;
 
-				addPowerButton.setPosition(xOffset, getContentY());
-				addPowerButton.extractRenderState(graphics, mouseX, mouseY, a);
+				setPowerButton.setPosition(xOffset, getContentY());
+				setPowerButton.extractRenderState(graphics, mouseX, mouseY, a);
 
-				xOffset += addPowerButton.getWidth() + PADDING;
+				xOffset += IMAGE_BUTTON_SIZE + PADDING;
 
-				removePowerButton.setPosition(xOffset, getContentY());
-				removePowerButton.extractRenderState(graphics, mouseX, mouseY, a);
+				gotoLocationButton.setPosition(xOffset, getContentY());
+				gotoLocationButton.extractRenderState(graphics, mouseX, mouseY, a);
 
-				xOffset += removePowerButton.getWidth() + PADDING;
+				xOffset += IMAGE_BUTTON_SIZE + PADDING;
 
 				deactivateButton.setPosition(xOffset, getContentY());
 				deactivateButton.extractRenderState(graphics, mouseX, mouseY, a);
@@ -502,20 +499,16 @@ public class ListCommandGui extends Screen
 
 					if (mouseIsInsideWidgetsBounds(gotoLocationButton, mouseX, mouseY))
 					{
-						tooltipText = I18N.getOrDefault(I18N_GOTO_LOCATION);
+						tooltipText = I18N.getOrDefault(I18N_GOTO_LOCATION_TOOLTIP);
 					}
-					else if (mouseIsInsideWidgetsBounds(addPowerButton, mouseX, mouseY))
+					else if (mouseIsInsideWidgetsBounds(setPowerButton, mouseX, mouseY))
 					{
-						tooltipText = I18N.getOrDefault(I18N_ADD_POWER);
+						tooltipText = I18N.getOrDefault(I18N_SET_POWER_TOOLTIP);
 
-					}
-					else if (mouseIsInsideWidgetsBounds(removePowerButton, mouseX, mouseY))
-					{
-						tooltipText = I18N.getOrDefault(I18N_REMOVE_POWER);
 					}
 					else if (mouseIsInsideWidgetsBounds(deactivateButton, mouseX, mouseY))
 					{
-						tooltipText = I18N.getOrDefault(I18N_DEACTIVATE);
+						tooltipText = I18N.getOrDefault(I18N_DEACTIVATE_TOOLTIP);
 					}
 					else
 					{
@@ -546,8 +539,37 @@ public class ListCommandGui extends Screen
 			@Override
 			public List<? extends GuiEventListener> children()
 			{
-				return ImmutableList.of(dimensionBox, locationBox, gotoLocationButton, addressBox, powerBox, addPowerButton, removePowerButton, deactivateButton);
+				return ImmutableList.of(dimensionBox, locationBox, gotoLocationButton, addressBox, powerBox, setPowerButton, deactivateButton);
 			}
 		}
+	}
+
+	private record SortMode(SortField field, SortDirection direction)
+	{
+		public SortMode(SortField field)
+		{
+			this(field, SortDirection.Ascending);
+		}
+
+		public SortMode invert()
+		{
+			return new SortMode(field, (direction == SortDirection.Ascending) ? SortDirection.Descending : SortDirection.Ascending);
+		}
+
+		public boolean isDescending() { return direction == SortDirection.Descending; }
+	}
+
+	private enum SortField
+	{
+		Dimension,
+		Location,
+		Address,
+		Power
+	}
+
+	private enum SortDirection
+	{
+		Ascending,
+		Descending
 	}
 }

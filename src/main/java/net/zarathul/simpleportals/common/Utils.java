@@ -14,6 +14,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.zarathul.simpleportals.SimplePortals;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.function.Supplier;
 
 /**
  * General utility class.
@@ -256,5 +258,22 @@ public final class Utils
 	public static String getReadableBlockPos(BlockPos pos)
 	{
 		return String.format("x=%d, z=%d, y=%d", pos.getX(), pos.getZ(), pos.getY());
+	}
+
+	/**
+	 * Swaps the input parameters to {@code comparator} if {@code condition} returns {@code true}
+	 *
+	 * @param condition
+	 * Determines if the input parameters to {@code comparator} will be swapped.
+	 * @param comparator
+	 * A comparator that gets it input parameters swapped based on {@code condition}.
+	 * @param <T>
+	 * Type of the object the {@code comparator} compares.
+	 * @return
+	 * A comparator that applies {@code comparator} with its own parameters but swapped, if {@code condition} returned {@code true}.
+	 */
+	public static <T> Comparator<T> invertComparator(Supplier<Boolean> condition, Comparator<T> comparator)
+	{
+		return (condition.get()) ? (a, b) -> comparator.compare(b, a) : comparator;
 	}
 }
