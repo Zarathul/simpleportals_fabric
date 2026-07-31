@@ -356,10 +356,13 @@ public class SimplePortals implements ModInitializer
 		public static void send(ServerPlayer player, ListCommandGui.GuiSettings guiSettings)
 		{
 			// Generate a PortalInfo for every registered portal.
+			// Using getInnerCornerPos() instead of pos() is crucial here, because corners can be shared by other portals.
+			// Positions inside the frame cannot. Only by doing this, is the client able to uniquely identify the portal to
+			// the server later, when asking for the power to be set or for the portal to be deactivated.
 			List<PortalInfo> portals = portalRegistry.getAllPortals().stream()
 				.map(portal -> new PortalInfo(
 					portal.dimension(),
-					portal.corner1().pos(),
+					portal.corner1().getInnerCornerPos(),
 					portal.address(),
 					portalRegistry.getPortalPower(portal))
 				)

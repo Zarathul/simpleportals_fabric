@@ -178,4 +178,26 @@ public record Portal(ResourceKey<Level> dimension, Address address, Axis axis,
 	{
 		return String.format("%s / %s / %s", Utils.getReadableBlockPos(corner1.pos()), dimension.identifier(), address.toString());
 	}
+
+	@Override
+	public boolean equals(Object o)
+	{
+		if (o == null || getClass() != o.getClass()) return false;
+
+		Portal portal = (Portal) o;
+		return axis == portal.axis && corner1.equals(portal.corner1) && corner2.equals(portal.corner2) && corner3.equals(portal.corner3) && corner4.equals(portal.corner4) && address.equals(portal.address) && dimension.equals(portal.dimension);
+	}
+
+	@Override
+	public int hashCode()
+	{
+		int result = dimension.hashCode();
+		result = 31 * result + address.hashCode();
+		result = 31 * result + axis.hashCode();
+		result = 31 * result + corner1.hashCode();
+		result = 31 * result + corner2.hashCode();
+		result = 31 * result + corner3.hashCode();
+		result = 31 * result + corner4.hashCode();
+		return result;
+	}
 }

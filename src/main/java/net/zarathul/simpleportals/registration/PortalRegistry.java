@@ -30,101 +30,56 @@ import java.util.*;
  */
 public final class PortalRegistry extends SavedData
 {
-	private final ImmutableMap<Direction,Direction[]> cornerSearchDirs;
+	private static final ImmutableMap<Direction,Direction[]> cornerSearchDirs = ImmutableMap.<Direction, Direction[]>builder()
+		.put(Direction.DOWN,  new Direction[] { Direction.SOUTH, Direction.EAST })
+		.put(Direction.UP,    new Direction[] { Direction.SOUTH, Direction.EAST })
+		.put(Direction.NORTH, new Direction[] { Direction.DOWN,  Direction.EAST })
+		.put(Direction.SOUTH, new Direction[] { Direction.DOWN,  Direction.EAST })
+		.put(Direction.WEST,  new Direction[] { Direction.DOWN,  Direction.SOUTH })
+		.put(Direction.EAST,  new Direction[] { Direction.DOWN,  Direction.SOUTH })
+		.build();
+
 	private final ListMultimap<BlockPos, Portal> portals;
 	private final ListMultimap<Address, Portal> addresses;
 	private final ListMultimap<Portal, BlockPos> gauges;
 	private final HashMap<Portal, Integer> power;
 
-	/**
-	 * Gets all registered portal positions alongside the respective portals.
-	 * Primarily used for serialization.
-	 *
-	 * @return
-	 * A list of {@link PortalEntry}s consisting of the portals position and the portal itself.
-	 */
-	public List<PortalEntry> portals()
-	{
-		var portalEntries = new ArrayList<PortalEntry>(portals.size());
-		portals.forEach((blockPos, portal) -> portalEntries.add(new PortalEntry(blockPos, portal)));
-
-		return portalEntries;
-	}
-
-	/**
-	 * Gets all registered addresses alongside the respective portals.
-	 * Primarily used for serialization.
-	 *
-	 * @return
-	 * A list of {@link AddressEntry}s consisting of the portals address and the portal itself.
-	 */
-	public List<AddressEntry> addresses()
-	{
-		var addressEntries = new ArrayList<AddressEntry>(addresses.size());
-		addresses.forEach((address, portal) -> addressEntries.add(new AddressEntry(address, portal)));
-
-		return addressEntries;
-	}
-
-	/**
-	 * Gets all registered portals with power gauges, alongside the power gauges in those portals.
-	 * Primarily used for serialization.
-	 *
-	 * @return
-	 * A list of {@link GaugeEntry}s consisting of the portals and the position of the power gauge.
-	 */
-	public List<GaugeEntry> gauges()
-	{
-		var gaugeEntries = new ArrayList<GaugeEntry>(gauges.size());
-		gauges.forEach((portal, blockPos) -> gaugeEntries.add(new GaugeEntry(portal, blockPos)));
-
-		return gaugeEntries;
-	}
-
-	/**
-	 * Gets all registered portals alongside their respective power values.
-	 * Primarily used for serialization.
-	 *
-	 * @return
-	 * A list of {@link PowerEntry}s consisting of the portals and their power values.
-	 */
-	public List<PowerEntry> power()
-	{
-		var powerEntries = new ArrayList<PowerEntry>(power.size());
-		power.forEach((portal, integer) -> powerEntries.add(new PowerEntry(portal, integer)));
-
-		return powerEntries;
-	}
 
 	public PortalRegistry()
 	{
-		this(new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
+		this(new ArrayList<>());
 	}
 
-	public PortalRegistry(List<PortalEntry> portals, List<AddressEntry> addresses, List<GaugeEntry> gauges, List<PowerEntry> power)
+	public PortalRegistry(List<PortalRecord> records)
 	{
-		// CopyPasta from the default constructor, because calling 'this()' would also initialize all the maps.
-		// Factoring out the initialization is also not an option, because the 'cornerSearchDirs' field is final.
-		EnumMap<Direction,Direction[]> temp = Maps.newEnumMap(Direction.class);
-		temp.put(Direction.DOWN, new Direction[] { Direction.SOUTH, Direction.EAST });
-		temp.put(Direction.UP, new Direction[] { Direction.SOUTH, Direction.EAST });
-		temp.put(Direction.NORTH, new Direction[] { Direction.DOWN, Direction.EAST });
-		temp.put(Direction.SOUTH, new Direction[] { Direction.DOWN, Direction.EAST });
-		temp.put(Direction.WEST, new Direction[] { Direction.DOWN, Direction.SOUTH });
-		temp.put(Direction.EAST, new Direction[] { Direction.DOWN, Direction.SOUTH });
-		cornerSearchDirs = Maps.immutableEnumMap(temp);
-
 		this.portals = ArrayListMultimap.create();
-		portals.forEach(portalEntry -> this.portals.put(portalEntry.pos, portalEntry.portal));
-
 		this.addresses = ArrayListMultimap.create();
-		addresses.forEach(addressEntry -> this.addresses.put(addressEntry.address, addressEntry.portal));
-
 		this.gauges = ArrayListMultimap.create();
-		gauges.forEach(gaugeEntry -> this.gauges.put(gaugeEntry.portal, gaugeEntry.pos));
-
 		this.power = Maps.newHashMap();
-		power.forEach(powerEntry -> this.power.put(powerEntry.portal, powerEntry.power));
+
+		fromPortalRecords(records);
+	}
+
+	private List<PortalRecord> toPortalRecords()
+	{
+		List<PortalRecord> records = new ArrayList<>(portals.values().size());
+
+		portals.values().stream().distinct().forEach(portal -> {
+			records.add(new PortalRecord(portal, gauges.get(portal), power.get(portal)));
+		});
+
+		return records;
+	}
+
+	private void fromPortalRecords(List<PortalRecord> records)
+	{
+		for (var record : records)
+		{
+			record.portal.getAllPositions().forEach(blockPos -> portals.put(blockPos.immutable(), record.portal));
+			addresses.put(record.portal().address(), record.portal);
+			record.gauges.forEach(blockPos -> gauges.put(record.portal, blockPos.immutable()));
+			power.put(record.portal, record.power);
+		}
 	}
 
 	/**
@@ -855,7 +810,7 @@ public final class PortalRegistry extends SavedData
 		
 		addresses.put(portal.address(), portal);
 		power.put(portal, 0);
-		powerGauges.forEach(pos -> gauges.put(portal, pos));
+		powerGauges.forEach(pos -> gauges.put(portal, pos.immutable()));
 		
 		updatePowerGauges(world, portal);
 		
@@ -928,44 +883,17 @@ public final class PortalRegistry extends SavedData
 
 	public record TeleportationDestination(BlockPos pos, Direction facing) {}
 
-	// Used for serialization. Using these as an intermediary step is a workaround, because I could not figure out how to serialize ArrayListMultimap directly.
-	public record PortalEntry(BlockPos pos, Portal portal)
+	public record PortalRecord(Portal portal, List<BlockPos> gauges, int power)
 	{
-		public static final Codec<PortalEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-				BlockPos.CODEC.fieldOf("pos").forGetter(PortalEntry::pos),
-				Portal.CODEC.fieldOf("portal").forGetter(PortalEntry::portal)
-		).apply(instance, PortalEntry::new));
-	}
-
-	public record AddressEntry(Address address, Portal portal)
-	{
-		public static final Codec<AddressEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-				Address.CODEC.fieldOf("address").forGetter(AddressEntry::address),
-				Portal.CODEC.fieldOf("portal").forGetter(AddressEntry::portal)
-		).apply(instance, AddressEntry::new));
-	}
-
-	public record GaugeEntry(Portal portal, BlockPos pos)
-	{
-		public static final Codec<GaugeEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-				Portal.CODEC.fieldOf("portal").forGetter(GaugeEntry::portal),
-				BlockPos.CODEC.fieldOf("pos").forGetter(GaugeEntry::pos)
-		).apply(instance, GaugeEntry::new));
-	}
-
-	public record PowerEntry(Portal portal, int power)
-	{
-		public static final Codec<PowerEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-				Portal.CODEC.fieldOf("portal").forGetter(PowerEntry::portal),
-				Codec.INT.fieldOf("power").forGetter(PowerEntry::power)
-		).apply(instance, PowerEntry::new));
+		public static final Codec<PortalRecord> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+			Portal.CODEC.fieldOf("portal").forGetter(PortalRecord::portal),
+			Codec.list(BlockPos.CODEC).fieldOf("gauges").forGetter(PortalRecord::gauges),
+			Codec.INT.fieldOf("power").forGetter(PortalRecord::power)
+		).apply(instance, PortalRecord::new));
 	}
 
 	public static final Codec<PortalRegistry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-					Codec.list(PortalEntry.CODEC).fieldOf("portals").forGetter(PortalRegistry::portals),
-					Codec.list(AddressEntry.CODEC).fieldOf("addresses").forGetter(PortalRegistry::addresses),
-					Codec.list(GaugeEntry.CODEC).fieldOf("gauges").forGetter(PortalRegistry::gauges),
-					Codec.list(PowerEntry.CODEC).fieldOf("power").forGetter(PortalRegistry::power)
+					Codec.list(PortalRecord.CODEC).fieldOf("portal_records").forGetter(PortalRegistry::toPortalRecords)
 			).apply(instance, PortalRegistry::new)
 	);
 
