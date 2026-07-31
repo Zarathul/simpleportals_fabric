@@ -1,6 +1,9 @@
 package net.zarathul.simpleportals.configuration.gui;
 
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableListMultimap;
+import com.google.common.collect.Multimap;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -12,13 +15,13 @@ import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
 import net.minecraft.client.gui.layouts.LinearLayout;
 import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.locale.Language;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.Identifier;
-import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.zarathul.simpleportals.SimplePortals;
@@ -29,8 +32,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
-
-// TODO: Maybe replace manual ItemStack rendering with ItemDisplayWidget
 
 @Environment(EnvType.CLIENT)
 public class ListCommandGui extends Screen
@@ -44,10 +45,9 @@ public class ListCommandGui extends Screen
 	private PlainTextButton locationLabel;
 	private PlainTextButton addressLabel;
 	private PlainTextButton powerLabel;
+	private final Sorting sorting;
 	private final Filter filter;
 	private final HeaderAndFooterLayout layout;
-
-	private SortMode sortMode = new SortMode(SortField.Address, SortDirection.Ascending);
 
 	private static final int PADDING = 5;
 	private static final int BUTTON_HEIGHT = Button.DEFAULT_HEIGHT;
@@ -70,16 +70,16 @@ public class ListCommandGui extends Screen
 
 	public ListCommandGui(List<PortalInfo> portals)
 	{
-		this(portals, Filter.NONE, new SortMode(SortField.Address, SortDirection.Ascending));
+		this(portals, GuiSettings.DEFAULT);
 	}
 
-	public ListCommandGui(List<PortalInfo> portals, Filter filter, SortMode sortMode)
+	public ListCommandGui(List<PortalInfo> portals, GuiSettings guiSettings)
 	{
 		super(Component.translatable("config.portal_list_header"));
 
 		this.portals = portals;
-		this.filter = filter;
-		this.sortMode = sortMode;
+		this.sorting = guiSettings.sorting;
+		this.filter = guiSettings.filter;
 
 		int HEADER_HEIGHT = 2 * font.lineHeight + BUTTON_HEIGHT + 4 * PADDING;
 		layout = new HeaderAndFooterLayout(this, HEADER_HEIGHT, FOOTER_HEIGHT);
@@ -114,11 +114,13 @@ public class ListCommandGui extends Screen
 		filterTypeButton = new CycleButtonEx<>(BUTTON_HEIGHT, FILTER_TYPE_BUTTON_WIDTH, this::stringifyEnumAsTranslatableKey, (button -> {
 			filterConditionButton.setValues(Filter.CONDITIONS_BY_TYPE.get(filterTypeButton.getSelectedValue()));
 		}));
+		filterTypeButton.setSortingComparator((o1, o2) -> Integer.compare(o1.ordinal(), o2.ordinal()));	// The enum is already in the same order as the columns of the list, so just use the ordinal value for simplicity.
 		filterTypeButton.setValues(Filter.CONDITIONS_BY_TYPE.keySet());
 		filterTypeButton.setSelectedValue(filter.type);
 		filterHorizontalLayout.addChild(filterTypeButton, layoutSettings -> layoutSettings.alignVerticallyMiddle().paddingRight(PADDING));
 
 		filterConditionButton = new CycleButtonEx<>(BUTTON_HEIGHT, FILTER_CONDITION_BUTTON_WIDTH, this::stringifyEnumAsTranslatableKey);
+		filterConditionButton.setSortingComparator((o1, o2) -> Integer.compare(o1.ordinal(), o2.ordinal()));	// The enum is already in the same order as the columns of the list, so just use the ordinal value for simplicity.
 		filterConditionButton.setValues(Filter.CONDITIONS_BY_TYPE.get(filter.type));
 		filterConditionButton.setSelectedValue(filter.condition);
 		filterHorizontalLayout.addChild(filterConditionButton, layoutSettings -> layoutSettings.alignVerticallyMiddle().paddingRight(PADDING));
@@ -126,17 +128,7 @@ public class ListCommandGui extends Screen
 		filterValueBox = new EditBox(font, 0, 0, 10, BUTTON_HEIGHT, CommonComponents.EMPTY);
 		filterValueBox.setMaxLength(256);
 		resizeFilterValueBox();
-		if (filter.value != null)
-		{
-			if (filter.value instanceof BlockPos)
-			{
-				filterValueBox.setValue(Utils.getReadableBlockPos((BlockPos)filter.value));
-			}
-			else
-			{
-				filterValueBox.setValue(filter.value.toString());
-			}
-		}
+		filterValueBox.setValue(filter.value);
 		filterHorizontalLayout.addChild(filterValueBox, layoutSettings -> layoutSettings.alignVerticallyMiddle().paddingRight(PADDING));
 
 		filterHorizontalLayout.addChild(Button.builder(Component.translatable("config.apply"), this::applyFilter).width(APPLY_BUTTON_WIDTH).build(), layoutSettings -> layoutSettings.alignVerticallyMiddle().paddingRight(PADDING));
@@ -145,20 +137,14 @@ public class ListCommandGui extends Screen
 		LinearLayout thirdRow = LinearLayout.horizontal();
 		verticalLayout.addChild(thirdRow);
 
-		dimensionLabel = new PlainTextButton(0, 0, font.width(DIMENSION_HEADER.getVisualOrderText()), 9, DIMENSION_HEADER, _ -> onColumnLabelPressed(SortField.Dimension), font);
+		dimensionLabel = new PlainTextButton(0, 0, font.width(DIMENSION_HEADER.getVisualOrderText()), 9, DIMENSION_HEADER, _ -> onColumnLabelPressed(Sorting.Type.Dimension), font);
 		thirdRow.addChild(dimensionLabel);
-		locationLabel = new PlainTextButton(0, 0, font.width(LOCATION_HEADER.getVisualOrderText()), 9, LOCATION_HEADER, _ -> onColumnLabelPressed(SortField.Location), font);
+		locationLabel = new PlainTextButton(0, 0, font.width(LOCATION_HEADER.getVisualOrderText()), 9, LOCATION_HEADER, _ -> onColumnLabelPressed(Sorting.Type.Location), font);
 		thirdRow.addChild(locationLabel);
-		addressLabel = new PlainTextButton(0, 0, font.width(ADDRESS_HEADER.getVisualOrderText()), 9, ADDRESS_HEADER, _ -> onColumnLabelPressed(SortField.Address), font);
+		addressLabel = new PlainTextButton(0, 0, font.width(ADDRESS_HEADER.getVisualOrderText()), 9, ADDRESS_HEADER, _ -> onColumnLabelPressed(Sorting.Type.Address), font);
 		thirdRow.addChild(addressLabel);
-		powerLabel = new PlainTextButton(0, 0, font.width(POWER_HEADER.getVisualOrderText()), 9, POWER_HEADER, _ -> onColumnLabelPressed(SortField.Power), font);
+		powerLabel = new PlainTextButton(0, 0, font.width(POWER_HEADER.getVisualOrderText()), 9, POWER_HEADER, _ -> onColumnLabelPressed(Sorting.Type.Power), font);
 		thirdRow.addChild(powerLabel);
-	}
-
-	private void onColumnLabelPressed(SortField sortField)
-	{
-		sortMode = (sortMode.field == sortField) ? sortMode.invert() : new SortMode(sortField);
-		minecraft.gui.setScreen(new ListCommandGui(portals, filter, sortMode));
 	}
 
 	private void addContents()
@@ -172,14 +158,15 @@ public class ListCommandGui extends Screen
 		layout.addToFooter(Button.builder(CommonComponents.GUI_DONE, button -> onClose()).width(200).build());	// Done button
 	}
 
+	private void onColumnLabelPressed(Sorting.Type type)
+	{
+		minecraft.gui.setScreen(new ListCommandGui(portals, new GuiSettings((sorting.type == type) ? sorting.invert() : new Sorting(type), filter)));
+	}
+
 	private void applyFilter(Button button)
 	{
-		String valueText = filterValueBox.getValue();
-		Object value = (filterTypeButton.getSelectedValue() == Filter.Type.Power) ? Integer.valueOf(valueText) : valueText;
-
-		Filter filter = new Filter(filterTypeButton.getSelectedValue(), filterConditionButton.getSelectedValue(), value);
-		// Trying to modify the screen resulted in all kinds of graphical bugs, so let's just make a new one every time the filter changes.
-		minecraft.gui.setScreen(new ListCommandGui(portals, filter, sortMode));
+		Filter filter = new Filter(filterTypeButton.getSelectedValue(), filterConditionButton.getSelectedValue(), filterValueBox.getValue());
+		minecraft.gui.setScreen(new ListCommandGui(portals, new GuiSettings(sorting, filter)));
 	}
 
 	private <T extends Enum<?>> String stringifyEnumAsTranslatableKey(T component)
@@ -261,13 +248,13 @@ public class ListCommandGui extends Screen
 		{
 			clearEntries();
 
-			switch (sortMode.field)
+			switch (sorting.type)
 			{
 				// Descending order is achieved by swapping the input parameters to the comparator.
-				case Dimension -> this.portals.sort(Utils.invertComparator(sortMode::isDescending, (o1, o2) -> o1.dimension().identifier().compareTo(o2.dimension().identifier())));
-				case Location -> this.portals.sort(Comparator.<PortalInfo, Identifier>comparing(portalInfo -> portalInfo.dimension().identifier()).thenComparing(Utils.invertComparator(sortMode::isDescending, (o1, o2) -> o1.location().compareTo(o2.location()))));
-				case Address -> this.portals.sort(Utils.invertComparator(sortMode::isDescending, (o1, o2) -> o1.address().compareTo(o2.address())));
-				case Power -> this.portals.sort(Utils.invertComparator(sortMode::isDescending, (o1, o2) -> Integer.compare(o1.power(), o2.power())));
+				case Dimension -> this.portals.sort(Utils.invertComparator(sorting::isDescending, (o1, o2) -> o1.dimension().identifier().compareTo(o2.dimension().identifier())));
+				case Location -> this.portals.sort(Comparator.<PortalInfo, Identifier>comparing(portalInfo -> portalInfo.dimension().identifier()).thenComparing(Utils.invertComparator(sorting::isDescending, (o1, o2) -> o1.location().compareTo(o2.location()))));
+				case Address -> this.portals.sort(Utils.invertComparator(sorting::isDescending, (o1, o2) -> o1.address().compareTo(o2.address())));
+				case Power -> this.portals.sort(Utils.invertComparator(sorting::isDescending, (o1, o2) -> Integer.compare(o1.power(), o2.power())));
 			}
 
 			switch (filter.type)
@@ -275,8 +262,8 @@ public class ListCommandGui extends Screen
 				case Dimension:
 					switch (filter.condition)
 					{
-						case Equals   -> portals.stream().filter(portal -> portal.dimension().toString().equals(filter.value.toString())).forEach(portal -> addEntry(new Entry(portal)));
-						case Contains -> portals.stream().filter(portal -> portal.dimension().toString().contains(filter.value.toString())).forEach(portal -> addEntry(new Entry(portal)));
+						case Equals   -> portals.stream().filter(portal -> portal.dimension().toString().equals(filter.value)).forEach(portal -> addEntry(new Entry(portal)));
+						case Contains -> portals.stream().filter(portal -> portal.dimension().toString().contains(filter.value)).forEach(portal -> addEntry(new Entry(portal)));
 					}
 
 					break;
@@ -284,33 +271,36 @@ public class ListCommandGui extends Screen
 				case Location:
 					switch (filter.condition)
 					{
-						case Equals   -> portals.stream().filter(portal -> Utils.getReadableBlockPos(portal.location()).equals(filter.value.toString())).forEach(portal -> addEntry(new Entry(portal)));
-						case Contains -> portals.stream().filter(portal -> Utils.getReadableBlockPos(portal.location()).contains(filter.value.toString())).forEach(portal -> addEntry(new Entry(portal)));
+						case Equals   -> portals.stream().filter(portal -> Utils.getReadableBlockPos(portal.location()).equals(filter.value)).forEach(portal -> addEntry(new Entry(portal)));
+						case Contains -> portals.stream().filter(portal -> Utils.getReadableBlockPos(portal.location()).contains(filter.value)).forEach(portal -> addEntry(new Entry(portal)));
 					}
 					break;
 
 				case Address:
 					switch (filter.condition)
 					{
-						case Equals   -> portals.stream().filter(portal -> portal.address().toString().equals(filter.value.toString())).forEach(portal -> addEntry(new Entry(portal)));
-						case Contains -> portals.stream().filter(portal -> portal.address().toString().contains(filter.value.toString())).forEach(portal -> addEntry(new Entry(portal)));
+						case Equals   -> portals.stream().filter(portal -> portal.address().toString().equals(filter.value)).forEach(portal -> addEntry(new Entry(portal)));
+						case Contains -> portals.stream().filter(portal -> portal.address().toString().contains(filter.value)).forEach(portal -> addEntry(new Entry(portal)));
 					}
 					break;
 
 				case Power:
-					switch (filter.condition)
+					try
 					{
-						case Equals      -> portals.stream().filter(portal -> portal.power() == (int)filter.value).forEach(portal -> addEntry(new Entry(portal)));
-						case LessThan    -> portals.stream().filter(portal -> portal.power()  < (int)filter.value).forEach(portal -> addEntry(new Entry(portal)));
-						case GreaterThan -> portals.stream().filter(portal -> portal.power()  > (int)filter.value).forEach(portal -> addEntry(new Entry(portal)));
+						int power = Integer.parseInt(filter.value);
+						switch (filter.condition)
+						{
+							case Equals      -> portals.stream().filter(portal -> portal.power() == power).forEach(portal -> addEntry(new Entry(portal)));
+							case LessThan    -> portals.stream().filter(portal -> portal.power()  < power).forEach(portal -> addEntry(new Entry(portal)));
+							case GreaterThan -> portals.stream().filter(portal -> portal.power()  > power).forEach(portal -> addEntry(new Entry(portal)));
+						}
 					}
+					catch (NumberFormatException _) {}
+
 					break;
 
 				default:
-					for (PortalInfo portal : portals)
-					{
-						addEntry(new Entry(portal));
-					}
+					portals.forEach(portalInfo -> addEntry(new Entry(portalInfo)));
 					break;
 			}
 		}
@@ -324,17 +314,16 @@ public class ListCommandGui extends Screen
 		@Override
 		protected int scrollBarX() { return width - LEFT_RIGHT_BORDER; }
 
-		public static int[] calculateEditBoxWidths(int rowWidth)
+		private static int[] calculateEditBoxWidths(int rowWidth)
 		{
 			int[] editBoxWidths = new int[4];
 
 			int addressItemsWidth = 4 * ADDRESS_ITEM_SIZE;
 			int totalBoxesWidth = rowWidth - addressItemsWidth - ((3 * IMAGE_BUTTON_SIZE) + (3 * PADDING));
-			float onePercentOfTotalBoxesWidth = totalBoxesWidth / 100f;
-			editBoxWidths[0] = (int)Math.floor(onePercentOfTotalBoxesWidth * 25);	// dimension
-			editBoxWidths[1] = (int)Math.floor(onePercentOfTotalBoxesWidth * 25);	// location
-			editBoxWidths[2] = (int)Math.floor(onePercentOfTotalBoxesWidth * 45);	// address
-			editBoxWidths[3] = (int)Math.floor(onePercentOfTotalBoxesWidth *  5);	// power
+			editBoxWidths[0] = (int)Math.floor(totalBoxesWidth * 0.25f);	// dimension
+			editBoxWidths[1] = (int)Math.floor(totalBoxesWidth * 0.25f);	// location
+			editBoxWidths[2] = (int)Math.floor(totalBoxesWidth * 0.45f);	// address
+			editBoxWidths[3] = (int)Math.floor(totalBoxesWidth * 0.05f);	// power
 
 			return editBoxWidths;
 		}
@@ -348,15 +337,12 @@ public class ListCommandGui extends Screen
 
 			private final EditBox dimensionBox;
 			private final EditBox locationBox;
-			private final ImageButton gotoLocationButton;
 			private final EditBox addressBox;
 			private final EditBox powerBox;
+			private final List<ItemDisplayWidget> addressBlockDisplays;
 			private final ImageButton setPowerButton;
+			private final ImageButton gotoLocationButton;
 			private final ImageButton deactivateButton;
-			private final List<ItemStack> addressItems = new ArrayList<>(4);
-			private final List<Identifier> addressIds = new ArrayList<>(4);
-			private final FormattedCharSequence[] addressBlockCountLabels = new FormattedCharSequence[4];
-			private final int[] addressBlockCountLabelWidths = new int[4];
 			private String tooltipText;
 
 			public Entry(PortalInfo portal)
@@ -373,24 +359,20 @@ public class ListCommandGui extends Screen
 				locationBox.setEditable(false);
 				locationBox.moveCursorToStart(false);
 
-				gotoLocationButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(Utils.createModIdentifier("teleport"), Utils.createModIdentifier("teleport_highlighted")), button -> {
-					minecraft.gui.setScreen(null);
-					ClientPlayNetworking.send(new SimplePortals.TpdCommandPayload(portal.dimension().identifier(), portal.location()));
-				});
-
-				int i = 0;
+				addressBlockDisplays = new ArrayList<>(4);
 
 				for (var addressComponent : portal.address().getBlockCounts().entrySet())
 				{
-					addressBlockCountLabels[i] = Component.literal(String.format("%dx", addressComponent.getValue())).getVisualOrderText();
-					addressBlockCountLabelWidths[i] = font.width(addressBlockCountLabels[i]);
-					i++;
-
 					Identifier blockId = Identifier.parse(addressComponent.getKey());
 					Block addressBlock = BuiltInRegistries.BLOCK.getValue(blockId);
-					ItemStack addressBlockItem = new ItemStack(addressBlock, 1);
-					addressItems.add(addressBlockItem);
-					addressIds.add(blockId);
+					ItemStack addressBlockItem = new ItemStack(addressBlock, addressComponent.getValue());
+
+					addressBlockDisplays.add(new ItemDisplayWidget(minecraft, 0, 0, ADDRESS_ITEM_SIZE, ADDRESS_ITEM_SIZE, Component.empty(), addressBlockItem, true, true));
+				}
+
+				for (int i = 0; i < 4 - portal.address().getBlockCounts().size(); i++)
+				{
+					addressBlockDisplays.add(new ItemDisplayWidget(minecraft, 0, 0, ADDRESS_ITEM_SIZE, ADDRESS_ITEM_SIZE, Component.empty(), ItemStack.EMPTY, false, false));
 				}
 
 				addressBox = new EditBox(minecraft.font, 0, 0, 100, defaultEntryHeight - PADDING, CommonComponents.EMPTY);
@@ -408,13 +390,18 @@ public class ListCommandGui extends Screen
 					try
 					{
 						int power = Integer.parseInt(powerBox.getValue());
-						ClientPlayNetworking.send(new SimplePortals.SetPortalPowerPayload(portal.dimension().identifier(), portal.location(), power));
+						ClientPlayNetworking.send(new SimplePortals.SetPortalPowerPayload(portal.dimension().identifier(), portal.location(), power, new GuiSettings(sorting, filter)));
 					}
 					catch (NumberFormatException _) {}
 				});
 
+				gotoLocationButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(Utils.createModIdentifier("teleport"), Utils.createModIdentifier("teleport_highlighted")), button -> {
+					minecraft.gui.setScreen(null);
+					ClientPlayNetworking.send(new SimplePortals.TpdCommandPayload(portal.dimension().identifier(), portal.location()));
+				});
+
 				deactivateButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(Utils.createModIdentifier("deactivate_button"), Utils.createModIdentifier("deactivate_button_highlighted")), button -> {
-					ClientPlayNetworking.send(new SimplePortals.DeactivatePortalPayload(portal.dimension().identifier(), portal.location()));
+					ClientPlayNetworking.send(new SimplePortals.DeactivatePortalPayload(portal.dimension().identifier(), portal.location(), new GuiSettings(sorting, filter)));
 				});
 
 				tooltipText = null;
@@ -444,28 +431,14 @@ public class ListCommandGui extends Screen
 
 				xOffset += locationBoxWidth + PADDING;
 
-				boolean tooltipSet = false;
-
-				for (int i = 0; i < addressItems.size(); i++)
+				for (var display : addressBlockDisplays)
 				{
-					ItemStack item = addressItems.get(i);
-					graphics.item(item, xOffset, getContentY());
-					graphics.text(minecraft.font, addressBlockCountLabels[i], Utils.centerIn(xOffset, ADDRESS_ITEM_SIZE, addressBlockCountLabelWidths[i]), getContentY() + ADDRESS_ITEM_SIZE - 3, -1);
+					display.setPosition(xOffset, getContentY());
+					display.extractRenderState(graphics, mouseX, mouseY, a);
 
-					if ((mouseX >= xOffset) &&
-						(mouseX < (xOffset + ADDRESS_ITEM_SIZE)) &&
-						(mouseY >= getContentY()) &&
-						(mouseY < (getContentY() + ADDRESS_ITEM_SIZE)))
-					{
-						tooltipText = addressIds.get(i).toString();
-						tooltipSet = true;
-					}
-
-					xOffset += ADDRESS_ITEM_SIZE;
+					xOffset += display.getWidth();
 				}
 
-				// Keep the distance to the next EditBox the same even if there are less than 4 address items.
-				xOffset += (4 - addressItems.size()) * (ADDRESS_ITEM_SIZE);
 				xOffset += PADDING;
 
 				addressBox.setPosition(xOffset, getContentY());
@@ -493,27 +466,24 @@ public class ListCommandGui extends Screen
 				deactivateButton.setPosition(xOffset, getContentY());
 				deactivateButton.extractRenderState(graphics, mouseX, mouseY, a);
 
-				if (!tooltipSet)
+				Language I18N = Language.getInstance();
+
+				if (mouseIsInsideWidgetsBounds(gotoLocationButton, mouseX, mouseY))
 				{
-					Language I18N = Language.getInstance();
+					tooltipText = I18N.getOrDefault(I18N_GOTO_LOCATION_TOOLTIP);
+				}
+				else if (mouseIsInsideWidgetsBounds(setPowerButton, mouseX, mouseY))
+				{
+					tooltipText = I18N.getOrDefault(I18N_SET_POWER_TOOLTIP);
 
-					if (mouseIsInsideWidgetsBounds(gotoLocationButton, mouseX, mouseY))
-					{
-						tooltipText = I18N.getOrDefault(I18N_GOTO_LOCATION_TOOLTIP);
-					}
-					else if (mouseIsInsideWidgetsBounds(setPowerButton, mouseX, mouseY))
-					{
-						tooltipText = I18N.getOrDefault(I18N_SET_POWER_TOOLTIP);
-
-					}
-					else if (mouseIsInsideWidgetsBounds(deactivateButton, mouseX, mouseY))
-					{
-						tooltipText = I18N.getOrDefault(I18N_DEACTIVATE_TOOLTIP);
-					}
-					else
-					{
-						tooltipText = null;
-					}
+				}
+				else if (mouseIsInsideWidgetsBounds(deactivateButton, mouseX, mouseY))
+				{
+					tooltipText = I18N.getOrDefault(I18N_DEACTIVATE_TOOLTIP);
+				}
+				else
+				{
+					tooltipText = null;
 				}
 			}
 
@@ -539,37 +509,142 @@ public class ListCommandGui extends Screen
 			@Override
 			public List<? extends GuiEventListener> children()
 			{
-				return ImmutableList.of(dimensionBox, locationBox, gotoLocationButton, addressBox, powerBox, setPowerButton, deactivateButton);
+				return ImmutableList.of(dimensionBox, locationBox, addressBox, addressBlockDisplays.get(0), addressBlockDisplays.get(1), addressBlockDisplays.get(2), addressBlockDisplays.get(3), powerBox, setPowerButton, gotoLocationButton, deactivateButton);
 			}
 		}
 	}
 
-	private record SortMode(SortField field, SortDirection direction)
+	public record Sorting(Type type, Direction direction)
 	{
-		public SortMode(SortField field)
+		public static final Sorting DEFAULT = new Sorting(Type.Address);
+
+		public Sorting(Type type)
 		{
-			this(field, SortDirection.Ascending);
+			this(type, Direction.Ascending);
 		}
 
-		public SortMode invert()
+		public Sorting invert()
 		{
-			return new SortMode(field, (direction == SortDirection.Ascending) ? SortDirection.Descending : SortDirection.Ascending);
+			return new Sorting(type, (direction == Direction.Ascending) ? Direction.Descending : Direction.Ascending);
 		}
 
-		public boolean isDescending() { return direction == SortDirection.Descending; }
+		public boolean isDescending() { return direction == Direction.Descending; }
+
+		public enum Type
+		{
+			Dimension,
+			Location,
+			Address,
+			Power
+		}
+
+		public enum Direction
+		{
+			Ascending,
+			Descending
+		}
+
+		public static final StreamCodec<FriendlyByteBuf, Sorting> STREAM_CODEC = new StreamCodec<FriendlyByteBuf, Sorting>()
+		{
+			@Override
+			public Sorting decode(FriendlyByteBuf input)
+			{
+				return new Sorting(input.readEnum(Type.class), input.readEnum(Direction.class));
+			}
+
+			@Override
+			public void encode(FriendlyByteBuf output, Sorting value)
+			{
+				output.writeEnum(value.type);
+				output.writeEnum(value.direction);
+			}
+		};
 	}
 
-	private enum SortField
+	public record Filter(Type type, Condition condition, String value)
 	{
-		Dimension,
-		Location,
-		Address,
-		Power
+		public static final Filter NONE = new Filter(Filter.Type.None, Filter.Condition.None, "");
+		public static final Multimap<Type, Condition> CONDITIONS_BY_TYPE;
+
+		static
+		{
+			var conditionsByType = ArrayListMultimap.<Type, Condition>create();
+			conditionsByType.put(Type.None, Condition.None);
+
+			conditionsByType.put(Type.Dimension, Condition.Equals);
+			conditionsByType.put(Type.Dimension, Condition.Contains);
+
+			conditionsByType.put(Type.Location, Condition.Equals);
+			conditionsByType.put(Type.Location, Condition.Contains);
+
+			conditionsByType.put(Type.Address, Condition.Equals);
+			conditionsByType.put(Type.Address, Condition.Contains);
+
+			conditionsByType.put(Type.Power, Condition.Equals);
+			conditionsByType.put(Type.Power, Condition.GreaterThan);
+			conditionsByType.put(Type.Power, Condition.LessThan);
+
+			CONDITIONS_BY_TYPE = ImmutableListMultimap.copyOf(conditionsByType);
+		}
+
+		// The ordering of the enum values should reflect the order of columns in the list. Otherwise,
+		// the cycle button for setting up the filter will have a different order than the columns.
+		// It uses the ordinal values for ordering.
+		public enum Type
+		{
+			None,
+			Dimension,
+			Location,
+			Address,
+			Power
+		}
+
+		public enum Condition
+		{
+			None,
+			Equals,
+			GreaterThan,
+			LessThan,
+			Contains
+		}
+
+		public static final StreamCodec<FriendlyByteBuf, Filter> STREAM_CODEC = new StreamCodec<FriendlyByteBuf, Filter>()
+		{
+			@Override
+			public Filter decode(FriendlyByteBuf input)
+			{
+				return new Filter(input.readEnum(Type.class), input.readEnum(Condition.class), input.readUtf());
+			}
+
+			@Override
+			public void encode(FriendlyByteBuf output, Filter value)
+			{
+				output.writeEnum(value.type);
+				output.writeEnum(value.condition);
+				output.writeUtf(value.value);
+			}
+		};
 	}
 
-	private enum SortDirection
+	public record GuiSettings(Sorting sorting, Filter filter)
 	{
-		Ascending,
-		Descending
+		public static final GuiSettings DEFAULT = new GuiSettings(Sorting.DEFAULT, Filter.NONE);
+
+		public static StreamCodec<FriendlyByteBuf, GuiSettings> STREAM_CODEC = new StreamCodec<FriendlyByteBuf, GuiSettings>()
+		{
+			@Override
+			public GuiSettings decode(FriendlyByteBuf input)
+			{
+				return new GuiSettings(Sorting.STREAM_CODEC.decode(input), Filter.STREAM_CODEC.decode(input));
+			}
+
+			@Override
+			public void encode(FriendlyByteBuf output, GuiSettings value)
+			{
+				Sorting.STREAM_CODEC.encode(output, value.sorting);
+				Filter.STREAM_CODEC.encode(output, value.filter);
+			}
+		};
 	}
+
 }

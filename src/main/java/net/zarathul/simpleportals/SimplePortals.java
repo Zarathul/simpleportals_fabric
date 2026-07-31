@@ -41,6 +41,7 @@ import net.zarathul.simpleportals.commands.CommandTeleport;
 import net.zarathul.simpleportals.commands.arguments.BlockArgument;
 import net.zarathul.simpleportals.common.Utils;
 import net.zarathul.simpleportals.configuration.Config;
+import net.zarathul.simpleportals.configuration.gui.ListCommandGui;
 import net.zarathul.simpleportals.configuration.gui.PortalInfo;
 import net.zarathul.simpleportals.items.ItemPortalActivator;
 import net.zarathul.simpleportals.items.ItemPortalFrame;
@@ -171,14 +172,14 @@ public class SimplePortals implements ModInitializer
 	private static void registerCustomPackerHandlers()
 	{
 		// Register custom network payloads.
-		PayloadTypeRegistry.serverboundPlay().register(ConfigCommandPayload.TYPE, ConfigCommandPayload.CODEC);
-		PayloadTypeRegistry.clientboundPlay().register(ConfigCommandPayload.TYPE, ConfigCommandPayload.CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(ConfigCommandPayload.TYPE, ConfigCommandPayload.STREAM_CODEC);
+		PayloadTypeRegistry.clientboundPlay().register(ConfigCommandPayload.TYPE, ConfigCommandPayload.STREAM_CODEC);
 
-		PayloadTypeRegistry.serverboundPlay().register(TpdCommandPayload.TYPE, TpdCommandPayload.CODEC);
-		PayloadTypeRegistry.serverboundPlay().register(SetPortalPowerPayload.TYPE, SetPortalPowerPayload.CODEC);
-		PayloadTypeRegistry.serverboundPlay().register(DeactivatePortalPayload.TYPE, DeactivatePortalPayload.CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(TpdCommandPayload.TYPE, TpdCommandPayload.STREAM_CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(SetPortalPowerPayload.TYPE, SetPortalPowerPayload.STREAM_CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(DeactivatePortalPayload.TYPE, DeactivatePortalPayload.STREAM_CODEC);
 
-		PayloadTypeRegistry.clientboundPlay().register(ListCommandPayload.TYPE, ListCommandPayload.CODEC);
+		PayloadTypeRegistry.clientboundPlay().register(ListCommandPayload.TYPE, ListCommandPayload.STREAM_CODEC);
 
 		// Server side receiver for the config command. Stores the received settings in the config of the server,
 		// assuming the player has the required permissions.
@@ -265,7 +266,7 @@ public class SimplePortals implements ModInitializer
 
 			Portal targetPortal = portals.getFirst();
 			portalRegistry.setPower(targetPortal, payload.value);
-			ListCommandPayload.send(player);
+			ListCommandPayload.send(player, payload.guiSettings);
 		});
 
 		ServerPlayNetworking.registerGlobalReceiver(DeactivatePortalPayload.TYPE, (payload, ctx) -> {
@@ -299,7 +300,7 @@ public class SimplePortals implements ModInitializer
 			}
 
 			portalRegistry.deactivatePortal(destinationLevel, payload.location);
-			ListCommandPayload.send(player);
+			ListCommandPayload.send(player, payload.guiSettings);
 		});
 	}
 
@@ -330,11 +331,17 @@ public class SimplePortals implements ModInitializer
 			.build();
 	}
 
-	public record ListCommandPayload(List<PortalInfo> portals) implements CustomPacketPayload
+	// Custom packets
+
+	public record ListCommandPayload(List<PortalInfo> portals, ListCommandGui.GuiSettings guiSettings) implements CustomPacketPayload
 	{
 		public static final Identifier ID = Utils.createModIdentifier("list_command");
 		public static final CustomPacketPayload.Type<ListCommandPayload> TYPE = new CustomPacketPayload.Type<>(ID);
-		public static final StreamCodec<FriendlyByteBuf, ListCommandPayload> CODEC = StreamCodec.composite(PortalInfo.LIST_STREAM_CODEC, ListCommandPayload::portals, ListCommandPayload::new);
+		public static final StreamCodec<FriendlyByteBuf, ListCommandPayload> STREAM_CODEC = StreamCodec.composite(
+			PortalInfo.LIST_STREAM_CODEC, ListCommandPayload::portals,
+			ListCommandGui.GuiSettings.STREAM_CODEC, ListCommandPayload::guiSettings,
+			ListCommandPayload::new
+		);
 
 		public @NonNull Type<? extends CustomPacketPayload> type()
 		{
@@ -342,6 +349,11 @@ public class SimplePortals implements ModInitializer
 		}
 
 		public static void send(ServerPlayer player)
+		{
+			send(player, ListCommandGui.GuiSettings.DEFAULT);
+		}
+
+		public static void send(ServerPlayer player, ListCommandGui.GuiSettings guiSettings)
 		{
 			// Generate a PortalInfo for every registered portal.
 			List<PortalInfo> portals = portalRegistry.getAllPortals().stream()
@@ -353,45 +365,47 @@ public class SimplePortals implements ModInitializer
 				)
 				.collect(Collectors.toList());
 
-			SimplePortals.ListCommandPayload outgoingPayload = new SimplePortals.ListCommandPayload(portals);
+			SimplePortals.ListCommandPayload outgoingPayload = new SimplePortals.ListCommandPayload(portals, guiSettings);
 			ServerPlayNetworking.send(player, outgoingPayload);
 		}
 	}
 
-	public record SetPortalPowerPayload(Identifier dimension, BlockPos location, int value) implements CustomPacketPayload
+	public record SetPortalPowerPayload(Identifier dimension, BlockPos location, int value, ListCommandGui.GuiSettings guiSettings) implements CustomPacketPayload
 	{
 		public static final Identifier ID = Utils.createModIdentifier("set_portal_power");
 		public static final CustomPacketPayload.Type<SetPortalPowerPayload> TYPE = new CustomPacketPayload.Type<>(ID);
 
-		public static final StreamCodec<FriendlyByteBuf, SetPortalPowerPayload> CODEC = StreamCodec.composite(
+		public static final StreamCodec<FriendlyByteBuf, SetPortalPowerPayload> STREAM_CODEC = StreamCodec.composite(
 			Identifier.STREAM_CODEC, SetPortalPowerPayload::dimension,
 			BlockPos.STREAM_CODEC, SetPortalPowerPayload::location,
 			ByteBufCodecs.INT, SetPortalPowerPayload::value,
+			ListCommandGui.GuiSettings.STREAM_CODEC, SetPortalPowerPayload::guiSettings,
 			SetPortalPowerPayload::new
 		);
 
-		public Type<? extends CustomPacketPayload> type() { return TYPE; }
+		public @NonNull Type<? extends CustomPacketPayload> type() { return TYPE; }
 	}
 
-	public record DeactivatePortalPayload(Identifier dimension, BlockPos location) implements CustomPacketPayload
+	public record DeactivatePortalPayload(Identifier dimension, BlockPos location, ListCommandGui.GuiSettings guiSettings) implements CustomPacketPayload
 	{
 		public static final Identifier ID = Utils.createModIdentifier("deactivate_portal");
 		public static final CustomPacketPayload.Type<DeactivatePortalPayload> TYPE = new CustomPacketPayload.Type<>(ID);
 
-		public static final StreamCodec<FriendlyByteBuf, DeactivatePortalPayload> CODEC = StreamCodec.composite(
+		public static final StreamCodec<FriendlyByteBuf, DeactivatePortalPayload> STREAM_CODEC = StreamCodec.composite(
 			Identifier.STREAM_CODEC, DeactivatePortalPayload::dimension,
 			BlockPos.STREAM_CODEC, DeactivatePortalPayload::location,
+			ListCommandGui.GuiSettings.STREAM_CODEC, DeactivatePortalPayload::guiSettings,
 			DeactivatePortalPayload::new
 		);
 
-		public Type<? extends CustomPacketPayload> type() { return TYPE; }
+		public @NonNull Type<? extends CustomPacketPayload> type() { return TYPE; }
 	}
 
 	public record ConfigCommandPayload(List<Config.ConfigValue> values, boolean fromDedicatedServer) implements CustomPacketPayload
 	{
 		public static final Identifier ID = Utils.createModIdentifier("config_command");
 		public static final CustomPacketPayload.Type<ConfigCommandPayload> TYPE = new CustomPacketPayload.Type<>(ID);
-		public static final StreamCodec<FriendlyByteBuf, ConfigCommandPayload> CODEC = StreamCodec.composite(
+		public static final StreamCodec<FriendlyByteBuf, ConfigCommandPayload> STREAM_CODEC = StreamCodec.composite(
 				Config.LIST_STREAM_CODEC, ConfigCommandPayload::values,
 				ByteBufCodecs.BOOL, ConfigCommandPayload::fromDedicatedServer,
 				ConfigCommandPayload::new
@@ -407,7 +421,7 @@ public class SimplePortals implements ModInitializer
 	{
 		public static final Identifier ID = Utils.createModIdentifier("tpd_command");
 		public static final CustomPacketPayload.Type<TpdCommandPayload> TYPE = new CustomPacketPayload.Type<>(ID);
-		public static final StreamCodec<FriendlyByteBuf, TpdCommandPayload> CODEC = StreamCodec.composite(
+		public static final StreamCodec<FriendlyByteBuf, TpdCommandPayload> STREAM_CODEC = StreamCodec.composite(
 				Identifier.STREAM_CODEC, TpdCommandPayload::dimension,
 				BlockPos.STREAM_CODEC, TpdCommandPayload::location,
 				TpdCommandPayload::new

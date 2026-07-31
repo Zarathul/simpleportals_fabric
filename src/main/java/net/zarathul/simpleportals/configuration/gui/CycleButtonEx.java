@@ -10,6 +10,7 @@ import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.function.Function;
 
@@ -20,6 +21,7 @@ public class CycleButtonEx<E> extends Button
 	private List<String> i18nValues = new ArrayList<>();
 	private int selectedIndex = -1;
 	private Function<E, String> stringifier;
+	private Comparator<E> comparator;
 
 	private static final Component INVALID_INDEX = Component.literal(":invalid index:");
 
@@ -76,7 +78,9 @@ public class CycleButtonEx<E> extends Button
 	public void onPress(InputWithModifiers input)
 	{
 		// Ensure the onPress handler gets the new value, by calling 'nextValue()' first.
-		nextValue();
+		if (input.hasShiftDown()) previousValue();
+		else nextValue();
+
 		super.onPress(input);
 	}
 
@@ -85,6 +89,14 @@ public class CycleButtonEx<E> extends Button
 		if (selectedIndex == -1) return;
 
 		selectedIndex = (selectedIndex + 1) % values.size();
+		setMessage(selectedValueComponent());
+	}
+
+	public void previousValue()
+	{
+		if (selectedIndex == -1) return;
+
+		selectedIndex = (selectedIndex - 1 + values.size()) % values.size();
 		setMessage(selectedValueComponent());
 	}
 
@@ -109,6 +121,11 @@ public class CycleButtonEx<E> extends Button
 		setMessage(message);
 	}
 
+	public void setSortingComparator(Comparator<E> comparator)
+	{
+		this.comparator = comparator;
+	}
+
 	public void setValues(Collection<E> values)
 	{
 		clear();
@@ -116,6 +133,8 @@ public class CycleButtonEx<E> extends Button
 		if (!values.isEmpty())
 		{
 			this.values.addAll(values);
+			if (comparator != null) this.values.sort(comparator);
+
 			updateI18nValues();
 			selectedIndex = 0;
 			setMessage(selectedValueComponent());

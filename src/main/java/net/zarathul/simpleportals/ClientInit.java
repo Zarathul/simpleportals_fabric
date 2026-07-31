@@ -28,6 +28,7 @@ public class ClientInit implements ClientModInitializer
 			Config.loadOrCreateConfigFile(SimplePortals.MOD_ID, false);
 		});
 
+		// Set tooltips for items.
 		ItemTooltipCallback.EVENT.register((stack, tooltipContext, tooltipFlag, lines) -> {
 			if (stack.getItem() == SimplePortals.itemPortalFrame)
 			{
@@ -81,7 +82,7 @@ public class ClientInit implements ClientModInitializer
 		// Receiver for portal data from the server if a list command was issued.
 		ClientPlayNetworking.registerGlobalReceiver(SimplePortals.ListCommandPayload.TYPE, (payload, ctx) -> {
 			var client = ctx.client();
-			client.execute(() -> client.gui.setScreen(new ListCommandGui(payload.portals())));
+			client.execute(() -> client.gui.setScreen(new ListCommandGui(payload.portals(), payload.guiSettings())));
 		});
 	}
 }
