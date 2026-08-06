@@ -107,16 +107,4 @@ public class ItemPortalActivator extends Item
 			lines.add(Component.translatable(toolTipKey));
 		}
 	}
-
-//	@Override
-//	public InteractionResult useOn(UseOnContext context)
-//	{
-//		if (context.getLevel().getBlockState(context.getClickedPos()).getBlock() instanceof BlockPortalFrame)
-//		{
-//			Player player = context.getPlayer();
-//			if (player != null) player.swing(context.getHand());
-//		}
-//
-//		return super.useOn(context);
-//	}
 }

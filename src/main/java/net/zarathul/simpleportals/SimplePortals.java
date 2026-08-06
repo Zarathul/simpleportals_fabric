@@ -150,8 +150,7 @@ public class SimplePortals implements ModInitializer
 		// Necessary for dismantling blocks with the portal activator on sneak right-click.
 		// Without this BlockPortalFrame.use() is never called when sneaking.
 		UseBlockCallback.EVENT.register((player, world, hand, hit) -> {
-			if (world.isClientSide() || (!player.isShiftKeyDown()) ||
-				(((ServerPlayer)player).gameMode.getGameModeForPlayer() == GameType.SPECTATOR))
+			if (world.isClientSide() || (!player.isShiftKeyDown()) || player.isSpectator())
 				return InteractionResult.PASS;
 
 			BlockState blockState = world.getBlockState(hit.getBlockPos());
@@ -166,7 +165,6 @@ public class SimplePortals implements ModInitializer
 
 			return InteractionResult.PASS;
 		});
-
 	}
 
 	private static void registerCustomPackerHandlers()
