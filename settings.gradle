@@ -9,3 +9,9 @@ pluginManagement {
 }
 
 rootProject.name = 'simpleportals'
+
+includeBuild("libs/simplemodslib") {
+    dependencySubstitution {
+        substitute module("net.zarathul:simplemodslib") using project(":")
+    }
+}

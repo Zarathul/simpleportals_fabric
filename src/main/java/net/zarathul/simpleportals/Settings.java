@@ -4,8 +4,8 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
-import net.zarathul.simplemods.api.configuration.Config;
-import net.zarathul.simplemods.api.configuration.ConfigSetting;
+import net.zarathul.simplemodslib.api.configuration.Config;
+import net.zarathul.simplemodslib.api.configuration.ConfigSetting;
 import net.zarathul.simpleportals.common.Utils;
 
 public final class Settings

@@ -4,7 +4,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.zarathul.simplemods.api.configuration.Config;
+import net.zarathul.simplemodslib.api.configuration.Config;
 import net.zarathul.simpleportals.gui.PortalListScreen;
 
 public class ClientInit implements ClientModInitializer

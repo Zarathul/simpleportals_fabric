@@ -19,7 +19,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
-import net.zarathul.simplemods.api.gui.CycleButtonEx;
+import net.zarathul.simplemodslib.api.gui.CycleButtonEx;
 import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.common.Utils;
 
