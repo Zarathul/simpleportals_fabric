@@ -1,0 +1,6 @@
+{
+	"config.gui.input_invalid": "Value is invalid and will not be saved!",
+	"config.gui.needs_world_restart": "Changing this value requires a world restart to take effect!",
+	"config.gui.reset_to_default": "Press to reset to default.",
+	"config.gui.save": "Save"
+}

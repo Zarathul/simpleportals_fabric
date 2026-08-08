@@ -1,0 +1,6 @@
+{
+	"config.gui.input_invalid": "Wert ist ungültig und wird nicht gespeichert!",
+	"config.gui.needs_world_restart": "Änderungen an diesem Wert setzen einen Neustart der Welt vorraus!",
+	"config.gui.reset_to_default": "Drücken um auf Standartwert zurückzusetzen.",
+	"config.gui.save": "Speichern"
+}
