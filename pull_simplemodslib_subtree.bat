@@ -1,1 +1,1 @@
-git subtree pull --prefix libs/simplemodslib https://github.com/Zarathul/simplemodslib.git master --squash
+git subtree pull --prefix libs/simplemodslib https://github.com/Zarathul/simplemodslib.git 26.2 --squash
