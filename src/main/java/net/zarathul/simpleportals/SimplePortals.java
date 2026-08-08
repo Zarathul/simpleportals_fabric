@@ -29,10 +29,10 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.zarathul.simplemods.api.configuration.Config;
 import net.zarathul.simpleportals.blocks.BlockPortal;
 import net.zarathul.simpleportals.blocks.BlockPortalFrame;
 import net.zarathul.simpleportals.blocks.BlockPowerGauge;
@@ -40,9 +40,8 @@ import net.zarathul.simpleportals.commands.CommandPortals;
 import net.zarathul.simpleportals.commands.CommandTeleport;
 import net.zarathul.simpleportals.commands.arguments.BlockArgument;
 import net.zarathul.simpleportals.common.Utils;
-import net.zarathul.simpleportals.configuration.Config;
-import net.zarathul.simpleportals.configuration.gui.ListCommandGui;
-import net.zarathul.simpleportals.configuration.gui.PortalInfo;
+import net.zarathul.simpleportals.gui.PortalInfo;
+import net.zarathul.simpleportals.gui.PortalListSettings;
 import net.zarathul.simpleportals.items.ItemPortalActivator;
 import net.zarathul.simpleportals.items.ItemPortalFrame;
 import net.zarathul.simpleportals.items.ItemPowerGauge;
@@ -58,9 +57,10 @@ import java.util.stream.Collectors;
 
 public class SimplePortals implements ModInitializer
 {
-	// constants
+	// ids and titles
 	public static final String MOD_ID = "simpleportals";
 	public static final String SIMPLE_MODS_ID = "simplemods";
+	public static final String CONFIG_GUI_TITLE = "§nSimplePortals";
 
 	// block and item names
 	public static final String BLOCK_PORTAL_NAME = "portal";
@@ -141,10 +141,7 @@ public class SimplePortals implements ModInitializer
 		// Load or create config file. Doing this at the start of onInitialize() would be preferable, but that leads to the validator of Settings.powerSource() failing.
 		// This happens because registries are not fully set up at that time, which the validator queries.
 		ServerLifecycleEvents.SERVER_STARTED.register((server) -> {
-			onDedicatedServer = server.isDedicatedServer();
-			Config.reset();
-			Settings.init();
-			Config.loadOrCreateConfigFile(MOD_ID, onDedicatedServer);
+			Config.initialize(MOD_ID, CONFIG_GUI_TITLE, server.isDedicatedServer(), Settings::init);
 		});
 
 		// Necessary for dismantling blocks with the portal activator on sneak right-click.
@@ -169,9 +166,7 @@ public class SimplePortals implements ModInitializer
 
 	private static void registerCustomPackerHandlers()
 	{
-		// Register custom network payloads.
-		PayloadTypeRegistry.serverboundPlay().register(ConfigCommandPayload.TYPE, ConfigCommandPayload.STREAM_CODEC);
-		PayloadTypeRegistry.clientboundPlay().register(ConfigCommandPayload.TYPE, ConfigCommandPayload.STREAM_CODEC);
+		Config.registerServerSideNetworking();
 
 		PayloadTypeRegistry.serverboundPlay().register(TpdCommandPayload.TYPE, TpdCommandPayload.STREAM_CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(SetPortalPowerPayload.TYPE, SetPortalPowerPayload.STREAM_CODEC);
@@ -179,15 +174,7 @@ public class SimplePortals implements ModInitializer
 
 		PayloadTypeRegistry.clientboundPlay().register(ListCommandPayload.TYPE, ListCommandPayload.STREAM_CODEC);
 
-		// Server side receiver for the config command. Stores the received settings in the config of the server,
-		// assuming the player has the required permissions.
-		ServerPlayNetworking.registerGlobalReceiver(ConfigCommandPayload.TYPE, (payload, ctx) -> {
-			var player = ctx.player();
-			Config.readServerSettings(false, payload.values, player);
-			Config.save(MOD_ID, true);
-		});
-
-		// Server side receiver for clicking on the teleport to portal button in the ListCommandGui.
+		// Handle "teleport" request from the client. Triggered by clicking the teleport to portal button in the PortalListScreen.
 		// Responsible for actually teleporting the client around.
 		ServerPlayNetworking.registerGlobalReceiver(TpdCommandPayload.TYPE, (payload, ctx) -> {
 			var player = ctx.player();
@@ -195,7 +182,7 @@ public class SimplePortals implements ModInitializer
 
 			if (!player.permissions().hasPermission(Permissions.COMMANDS_OWNER))
 			{
-				player.sendSystemMessage(Component.translatable("missing_permission"));
+				player.sendSystemMessage(Component.translatable("error.missing_permission"));
 				return;
 			}
 
@@ -205,7 +192,7 @@ public class SimplePortals implements ModInitializer
 
 			if (destinationLevel == null)
 			{
-				var localizedMessage = String.format(I18N.getOrDefault("dimension_missing"), dimension.identifier());
+				var localizedMessage = String.format(I18N.getOrDefault("error.dimension_missing"), dimension.identifier());
 				player.sendSystemMessage(Component.literal(localizedMessage));
 				return;
 			}
@@ -214,7 +201,7 @@ public class SimplePortals implements ModInitializer
 
 			if (portals.isEmpty())
 			{
-				var localizedMessage = String.format(I18N.getOrDefault("portal_missing"), dimension.identifier(), location);
+				var localizedMessage = String.format(I18N.getOrDefault("error.portal_missing"), dimension.identifier(), location);
 				player.sendSystemMessage(Component.literal(localizedMessage));
 				return;
 			}
@@ -224,7 +211,7 @@ public class SimplePortals implements ModInitializer
 
 			if (destination == null)
 			{
-				var localizedMessage = String.format(I18N.getOrDefault("portal_blocked"), destinationPortal.asReadableString());
+				var localizedMessage = String.format(I18N.getOrDefault("error.portal_blocked"), destinationPortal.asReadableString());
 				player.sendSystemMessage(Component.literal(localizedMessage));
 				return;
 			}
@@ -241,13 +228,14 @@ public class SimplePortals implements ModInitializer
 			);
 		});
 
+		// Handle "set portal power" request from the client. Triggered by clicking the set power button in the PortalListScreen.
 		ServerPlayNetworking.registerGlobalReceiver(SetPortalPowerPayload.TYPE, (payload, ctx) -> {
 			var player = ctx.player();
 			var I18N = Language.getInstance();
 
 			if (!player.permissions().hasPermission(Permissions.COMMANDS_OWNER))
 			{
-				player.sendSystemMessage(Component.translatable("missing_permission"));
+				player.sendSystemMessage(Component.translatable("error.missing_permission"));
 				return;
 			}
 
@@ -257,23 +245,24 @@ public class SimplePortals implements ModInitializer
 
 			if (portals.isEmpty())
 			{
-				var localizedMessage = String.format(I18N.getOrDefault("portal_missing"), dimension.identifier(), location);
+				var localizedMessage = String.format(I18N.getOrDefault("error.portal_missing"), dimension.identifier(), location);
 				player.sendSystemMessage(Component.literal(localizedMessage));
 				return;
 			}
 
 			Portal targetPortal = portals.getFirst();
 			portalRegistry.setPower(targetPortal, payload.value);
-			ListCommandPayload.send(player, payload.guiSettings);
+			ListCommandPayload.send(player, payload.portalListSettings);
 		});
 
+		// Handle "deactivate portal" request from the client. Triggered by clicking the deactivate portal button in the PortalListScreen.
 		ServerPlayNetworking.registerGlobalReceiver(DeactivatePortalPayload.TYPE, (payload, ctx) -> {
 			var player = ctx.player();
 			var I18N = Language.getInstance();
 
 			if (!player.permissions().hasPermission(Permissions.COMMANDS_OWNER))
 			{
-				player.sendSystemMessage(Component.translatable("missing_permission"));
+				player.sendSystemMessage(Component.translatable("error.missing_permission"));
 				return;
 			}
 
@@ -283,7 +272,7 @@ public class SimplePortals implements ModInitializer
 
 			if (destinationLevel == null)
 			{
-				var localizedMessage = String.format(I18N.getOrDefault("dimension_missing"), dimension.identifier());
+				var localizedMessage = String.format(I18N.getOrDefault("error.dimension_missing"), dimension.identifier());
 				player.sendSystemMessage(Component.literal(localizedMessage));
 				return;
 			}
@@ -292,13 +281,13 @@ public class SimplePortals implements ModInitializer
 
 			if (portals.isEmpty())
 			{
-				var localizedMessage = String.format(I18N.getOrDefault("portal_missing"), dimension.identifier(), location);
+				var localizedMessage = String.format(I18N.getOrDefault("error.portal_missing"), dimension.identifier(), location);
 				player.sendSystemMessage(Component.literal(localizedMessage));
 				return;
 			}
 
 			portalRegistry.deactivatePortal(destinationLevel, payload.location);
-			ListCommandPayload.send(player, payload.guiSettings);
+			ListCommandPayload.send(player, payload.portalListSettings);
 		});
 	}
 
@@ -331,13 +320,13 @@ public class SimplePortals implements ModInitializer
 
 	// Custom packets
 
-	public record ListCommandPayload(List<PortalInfo> portals, ListCommandGui.GuiSettings guiSettings) implements CustomPacketPayload
+	public record ListCommandPayload(List<PortalInfo> portals, PortalListSettings portalListSettings) implements CustomPacketPayload
 	{
 		public static final Identifier ID = Utils.createModIdentifier("list_command");
 		public static final CustomPacketPayload.Type<ListCommandPayload> TYPE = new CustomPacketPayload.Type<>(ID);
 		public static final StreamCodec<FriendlyByteBuf, ListCommandPayload> STREAM_CODEC = StreamCodec.composite(
 			PortalInfo.LIST_STREAM_CODEC, ListCommandPayload::portals,
-			ListCommandGui.GuiSettings.STREAM_CODEC, ListCommandPayload::guiSettings,
+			PortalListSettings.STREAM_CODEC, ListCommandPayload::portalListSettings,
 			ListCommandPayload::new
 		);
 
@@ -348,10 +337,10 @@ public class SimplePortals implements ModInitializer
 
 		public static void send(ServerPlayer player)
 		{
-			send(player, ListCommandGui.GuiSettings.DEFAULT);
+			send(player, PortalListSettings.DEFAULT);
 		}
 
-		public static void send(ServerPlayer player, ListCommandGui.GuiSettings guiSettings)
+		public static void send(ServerPlayer player, PortalListSettings portalListSettings)
 		{
 			// Generate a PortalInfo for every registered portal.
 			// Using getInnerCornerPos() instead of pos() is crucial here, because corners can be shared by other portals.
@@ -366,12 +355,12 @@ public class SimplePortals implements ModInitializer
 				)
 				.collect(Collectors.toList());
 
-			SimplePortals.ListCommandPayload outgoingPayload = new SimplePortals.ListCommandPayload(portals, guiSettings);
+			SimplePortals.ListCommandPayload outgoingPayload = new SimplePortals.ListCommandPayload(portals, portalListSettings);
 			ServerPlayNetworking.send(player, outgoingPayload);
 		}
 	}
 
-	public record SetPortalPowerPayload(Identifier dimension, BlockPos location, int value, ListCommandGui.GuiSettings guiSettings) implements CustomPacketPayload
+	public record SetPortalPowerPayload(Identifier dimension, BlockPos location, int value, PortalListSettings portalListSettings) implements CustomPacketPayload
 	{
 		public static final Identifier ID = Utils.createModIdentifier("set_portal_power");
 		public static final CustomPacketPayload.Type<SetPortalPowerPayload> TYPE = new CustomPacketPayload.Type<>(ID);
@@ -380,14 +369,14 @@ public class SimplePortals implements ModInitializer
 			Identifier.STREAM_CODEC, SetPortalPowerPayload::dimension,
 			BlockPos.STREAM_CODEC, SetPortalPowerPayload::location,
 			ByteBufCodecs.INT, SetPortalPowerPayload::value,
-			ListCommandGui.GuiSettings.STREAM_CODEC, SetPortalPowerPayload::guiSettings,
+			PortalListSettings.STREAM_CODEC, SetPortalPowerPayload::portalListSettings,
 			SetPortalPowerPayload::new
 		);
 
 		public @NonNull Type<? extends CustomPacketPayload> type() { return TYPE; }
 	}
 
-	public record DeactivatePortalPayload(Identifier dimension, BlockPos location, ListCommandGui.GuiSettings guiSettings) implements CustomPacketPayload
+	public record DeactivatePortalPayload(Identifier dimension, BlockPos location, PortalListSettings portalListSettings) implements CustomPacketPayload
 	{
 		public static final Identifier ID = Utils.createModIdentifier("deactivate_portal");
 		public static final CustomPacketPayload.Type<DeactivatePortalPayload> TYPE = new CustomPacketPayload.Type<>(ID);
@@ -395,27 +384,11 @@ public class SimplePortals implements ModInitializer
 		public static final StreamCodec<FriendlyByteBuf, DeactivatePortalPayload> STREAM_CODEC = StreamCodec.composite(
 			Identifier.STREAM_CODEC, DeactivatePortalPayload::dimension,
 			BlockPos.STREAM_CODEC, DeactivatePortalPayload::location,
-			ListCommandGui.GuiSettings.STREAM_CODEC, DeactivatePortalPayload::guiSettings,
+			PortalListSettings.STREAM_CODEC, DeactivatePortalPayload::portalListSettings,
 			DeactivatePortalPayload::new
 		);
 
 		public @NonNull Type<? extends CustomPacketPayload> type() { return TYPE; }
-	}
-
-	public record ConfigCommandPayload(List<Config.ConfigValue> values, boolean fromDedicatedServer) implements CustomPacketPayload
-	{
-		public static final Identifier ID = Utils.createModIdentifier("config_command");
-		public static final CustomPacketPayload.Type<ConfigCommandPayload> TYPE = new CustomPacketPayload.Type<>(ID);
-		public static final StreamCodec<FriendlyByteBuf, ConfigCommandPayload> STREAM_CODEC = StreamCodec.composite(
-				Config.LIST_STREAM_CODEC, ConfigCommandPayload::values,
-				ByteBufCodecs.BOOL, ConfigCommandPayload::fromDedicatedServer,
-				ConfigCommandPayload::new
-		);
-
-		public @NonNull Type<? extends CustomPacketPayload> type()
-		{
-			return TYPE;
-		}
 	}
 
 	public record TpdCommandPayload(Identifier dimension, BlockPos location) implements CustomPacketPayload

@@ -1,4 +1,4 @@
-package net.zarathul.simpleportals.configuration.gui;
+package net.zarathul.simpleportals.gui;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;

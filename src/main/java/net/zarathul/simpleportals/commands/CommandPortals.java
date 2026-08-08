@@ -4,7 +4,6 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.DimensionArgument;
@@ -18,17 +17,16 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.level.Level;
+import net.zarathul.simplemods.api.configuration.Config;
 import net.zarathul.simpleportals.Settings;
 import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.commands.arguments.BlockArgument;
 import net.zarathul.simpleportals.common.Utils;
-import net.zarathul.simpleportals.configuration.Config;
 import net.zarathul.simpleportals.mixin.EntityAccessor;
 import net.zarathul.simpleportals.registration.Address;
 import net.zarathul.simpleportals.registration.Portal;
 import net.zarathul.simpleportals.registration.PortalRegistry;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -63,16 +61,7 @@ public class CommandPortals
 			})
 			.then(
 				Commands.literal("config")
-				.executes(context -> {
-					var player =  context.getSource().getPlayer();
-					List<Config.ConfigValue> configValues = new ArrayList<>();
-					Config.writeServerSettings(false, configValues, player);
-					SimplePortals.ConfigCommandPayload outgoingPayload = new SimplePortals.ConfigCommandPayload(configValues, SimplePortals.onDedicatedServer);
-
-					ServerPlayNetworking.send(player, outgoingPayload);
-
-					return 1;
-				})
+				.executes(Config::executeCommand)
 			)
 			.then(
 				Commands.literal("list")
@@ -82,7 +71,7 @@ public class CommandPortals
 
 					if (!player.permissions().hasPermission(Permissions.COMMANDS_OWNER))
 					{
-						Utils.SendTranslatedMessage(context.getSource(), "missing_permission");
+						Utils.SendTranslatedMessage(context.getSource(), "error.missing_permission");
 						return 0;
 					}
 

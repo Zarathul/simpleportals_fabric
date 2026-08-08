@@ -1,4 +1,4 @@
-package net.zarathul.simpleportals.configuration.gui;
+package net.zarathul.simplemods.api.configuration;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -17,9 +17,9 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.permissions.Permission;
 import net.minecraft.server.permissions.PermissionLevel;
 import net.minecraft.world.entity.player.Player;
+import net.zarathul.simplemods.api.gui.CheckboxButtonEx;
+import net.zarathul.simplemods.api.gui.CycleButtonEx;
 import net.zarathul.simpleportals.common.Utils;
-import net.zarathul.simpleportals.configuration.Config;
-import net.zarathul.simpleportals.configuration.ConfigSetting;
 
 import java.util.Arrays;
 import java.util.Comparator;
@@ -28,7 +28,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Environment(EnvType.CLIENT)
-public class ConfigGui extends Screen
+public class ConfigScreen extends Screen
 {
 	private SettingsList settingsList;
 	private List<ConfigSetting> settings;
@@ -42,7 +42,14 @@ public class ConfigGui extends Screen
 	private static final int ENTRY_HEIGHT = 26;
 	private static final int FOOTER_HEIGHT = BUTTON_HEIGHT + 2 * PADDING;
 
-	public ConfigGui(List<ConfigSetting> settings, Component title, String configName, Player player, Consumer<Player> syncChanges)
+	private static final String I18N_GUI_PREFIX = "gui.";
+	private static final String I18N_TOOLTIP_SUFFIX = ".tooltip";
+	private static final String I18N_INVALID = Config.I18N_CONFIG_PREFIX + I18N_GUI_PREFIX + "input_invalid";
+	private static final String I18N_NEEDS_WORLD_RESTART = Config.I18N_CONFIG_PREFIX + I18N_GUI_PREFIX + "needs_world_restart";
+	private static final String I18N_RESET = Config.I18N_CONFIG_PREFIX + I18N_GUI_PREFIX + "reset_to_default";
+	private static final String I18N_SAVE = Config.I18N_CONFIG_PREFIX + I18N_GUI_PREFIX + "save";
+
+	public ConfigScreen(List<ConfigSetting> settings, Component title, String configName, Player player, Consumer<Player> syncChanges)
 	{
 		super(title);
 
@@ -85,7 +92,7 @@ public class ConfigGui extends Screen
 		horizontalLayout.spacing(PADDING);
 
 		horizontalLayout.addChild(Button.builder(CommonComponents.GUI_BACK, button -> onClose()).width(200).build());	// Cancel button
-		horizontalLayout.addChild(Button.builder(Component.translatable("config.save"), button -> saveConfigAndCloseScreen()).width(200).build());	// Done button
+		horizontalLayout.addChild(Button.builder(Component.translatable(I18N_SAVE), button -> saveConfigAndCloseScreen()).width(200).build());	// Done button
 	}
 
 	private void saveConfigAndCloseScreen()
@@ -94,7 +101,7 @@ public class ConfigGui extends Screen
 		Config.save(configName);
 		if (syncChanges != null) syncChanges.accept(player);
 
-		minecraft.gui.setScreen(new ConfigGui(settings, title, configName, player, syncChanges));
+		minecraft.gui.setScreen(new ConfigScreen(settings, title, configName, player, syncChanges));
 	}
 
 	@Override
@@ -109,11 +116,6 @@ public class ConfigGui extends Screen
 	public class SettingsList extends ContainerObjectSelectionList<SettingsList.Entry>
 	{
 		private static final int LEFT_RIGHT_BORDER = 30;
-		private static final String I18N_PREFIX = "config.";
-		private static final String I18N_TOOLTIP_SUFFIX = ".tooltip";
-		private static final String I18N_INVALID = "config.input_invalid";
-		private static final String I18N_NEEDS_WORLD_RESTART = "config.needs_world_restart";
-		private static final String I18N_RESET = "config.reset_to_default";
 
 		public SettingsList(List<ConfigSetting> settings, Player player, Minecraft mc, int width, int height, int top, int itemHeight)
 		{
@@ -202,7 +204,7 @@ public class ConfigGui extends Screen
 		private static String getLocalizedCategory(ConfigSetting setting)
 		{
 			var I18N = Language.getInstance();
-			String i18nKey = Config.CATEGORY_I18N_PREFIX + setting.category;
+			String i18nKey = Config.I18N_CATEGORY_PREFIX + setting.category.toLowerCase();
 
 			return I18N.getOrDefault(i18nKey); // If the key is not found, the key itself is returned instead of the translated text.
 		}
@@ -210,7 +212,7 @@ public class ConfigGui extends Screen
 		private static String getLocalizedDescription(ConfigSetting setting)
 		{
 			var I18N = Language.getInstance();
-			String i18nKey = I18N.getOrDefault(I18N_PREFIX + setting.descriptionKey, setting.id.getPath());
+			String i18nKey = I18N.getOrDefault(Config.I18N_CONFIG_PREFIX + setting.descriptionKey, setting.id.getPath());
 
 			return I18N.getOrDefault(i18nKey); // If the key is not found, the key itself is returned instead of the translated text.
 		}
@@ -389,7 +391,7 @@ public class ConfigGui extends Screen
 				{
 					// Tooltip for the description.
 					// If the key is not found, the key itself is returned instead of the translated text.
-					String i18nTooltipKey = I18N_PREFIX + setting.descriptionKey + I18N_TOOLTIP_SUFFIX;
+					String i18nTooltipKey = Config.I18N_CONFIG_PREFIX + setting.descriptionKey + I18N_TOOLTIP_SUFFIX;
 					String i18nTooltipText = I18N.getOrDefault(i18nTooltipKey);
 					tooltipText = (!i18nTooltipText.equals(i18nTooltipKey)) ? i18nTooltipText : setting.description;
 				}

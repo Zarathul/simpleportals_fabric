@@ -1,4 +1,4 @@
-package net.zarathul.simpleportals.configuration;
+package net.zarathul.simplemods.api.configuration;
 
 import net.minecraft.resources.Identifier;
 

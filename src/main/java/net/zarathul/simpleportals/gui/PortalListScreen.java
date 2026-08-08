@@ -1,9 +1,6 @@
-package net.zarathul.simpleportals.configuration.gui;
+package net.zarathul.simpleportals.gui;
 
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableListMultimap;
-import com.google.common.collect.Multimap;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -17,13 +14,12 @@ import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.locale.Language;
-import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
+import net.zarathul.simplemods.api.gui.CycleButtonEx;
 import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.common.Utils;
 
@@ -34,19 +30,19 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Environment(EnvType.CLIENT)
-public class ListCommandGui extends Screen
+public class PortalListScreen extends Screen
 {
 	private PortalList portalList;
 	private final List<PortalInfo> portals;
-	private CycleButtonEx<Filter.Type> filterTypeButton;
-	private CycleButtonEx<Filter.Condition> filterConditionButton;
+	private CycleButtonEx<PortalListSettings.Filter.Type> filterTypeButton;
+	private CycleButtonEx<PortalListSettings.Filter.Condition> filterConditionButton;
 	private EditBox filterValueBox;
 	private PlainTextButton dimensionLabel;
 	private PlainTextButton locationLabel;
 	private PlainTextButton addressLabel;
 	private PlainTextButton powerLabel;
-	private final Sorting sorting;
-	private final Filter filter;
+	private final PortalListSettings.Sorting sorting;
+	private final PortalListSettings.Filter filter;
 	private final HeaderAndFooterLayout layout;
 
 	private static final int PADDING = 5;
@@ -56,30 +52,35 @@ public class ListCommandGui extends Screen
 	private static final int FOOTER_HEIGHT = BUTTON_HEIGHT + 2 * PADDING;
 	private static final int ENTRY_HEIGHT = 26;
 
-	private static final Component FILTER_LABEL = Component.translatable("config.filter_by");
-	private static final Component DIMENSION_HEADER = Component.translatable("config.dimension_header");
-	private static final Component LOCATION_HEADER  = Component.translatable("config.location_header");
-	private static final Component ADDRESS_HEADER   = Component.translatable("config.address_header");
-	private static final Component POWER_HEADER     = Component.translatable("config.power_header");
+	private static final String    I18N_PREFIX         = "gui.portal_list.";
+	private static final String    I18N_ENUM_PREFIX    = I18N_PREFIX + "enums.";
+	private static final String    I18N_HEADER_SUFFIX  = ".header";
+	private static final String    I18N_TOOLTIP_SUFFIX = ".tooltip";
+	private static final Component APPLY_BUTTON_LABEL  = Component.translatable(I18N_PREFIX + "apply");
+	private static final Component FILTER_LABEL        = Component.translatable(I18N_PREFIX + "filter_by");
+	private static final Component LIST_HEADER         = Component.translatable(I18N_PREFIX + "header");
+	private static final Component DIMENSION_HEADER    = Component.translatable(I18N_PREFIX + "dimension" + I18N_HEADER_SUFFIX);
+	private static final Component LOCATION_HEADER     = Component.translatable(I18N_PREFIX + "location" + I18N_HEADER_SUFFIX);
+	private static final Component ADDRESS_HEADER      = Component.translatable(I18N_PREFIX + "address" + I18N_HEADER_SUFFIX);
+	private static final Component POWER_HEADER        = Component.translatable(I18N_PREFIX + "power" + I18N_HEADER_SUFFIX);
 
 	private static final int FILTER_TYPE_BUTTON_WIDTH = 80;
 	private static final int FILTER_CONDITION_BUTTON_WIDTH = 100;
 	private static final int APPLY_BUTTON_WIDTH = 60;
-	private static final String I18N_ENUM_PREFIX = "config.enums.";
 	private final int FILTER_LABEL_WIDTH = font.width(FILTER_LABEL);
 
-	public ListCommandGui(List<PortalInfo> portals)
+	public PortalListScreen(List<PortalInfo> portals)
 	{
-		this(portals, GuiSettings.DEFAULT);
+		this(portals, PortalListSettings.DEFAULT);
 	}
 
-	public ListCommandGui(List<PortalInfo> portals, GuiSettings guiSettings)
+	public PortalListScreen(List<PortalInfo> portals, PortalListSettings portalListSettings)
 	{
-		super(Component.translatable("config.portal_list_header"));
+		super(LIST_HEADER);
 
 		this.portals = portals;
-		this.sorting = guiSettings.sorting;
-		this.filter = guiSettings.filter;
+		this.sorting = portalListSettings.sorting();
+		this.filter = portalListSettings.filter();
 
 		int HEADER_HEIGHT = 2 * font.lineHeight + BUTTON_HEIGHT + 4 * PADDING;
 		layout = new HeaderAndFooterLayout(this, HEADER_HEIGHT, FOOTER_HEIGHT);
@@ -112,38 +113,38 @@ public class ListCommandGui extends Screen
 		filterHorizontalLayout.addChild(new StringWidget(FILTER_LABEL_WIDTH, 9, FILTER_LABEL, font), layoutSettings -> layoutSettings.alignVerticallyMiddle().paddingHorizontal(PADDING));
 
 		filterTypeButton = new CycleButtonEx<>(BUTTON_HEIGHT, FILTER_TYPE_BUTTON_WIDTH, this::stringifyEnumAsTranslatableKey, (button -> {
-			filterConditionButton.setValues(Filter.CONDITIONS_BY_TYPE.get(filterTypeButton.getSelectedValue()));
+			filterConditionButton.setValues(PortalListSettings.Filter.CONDITIONS_BY_TYPE.get(filterTypeButton.getSelectedValue()));
 		}));
 		filterTypeButton.setSortingComparator((o1, o2) -> Integer.compare(o1.ordinal(), o2.ordinal()));	// The enum is already in the same order as the columns of the list, so just use the ordinal value for simplicity.
-		filterTypeButton.setValues(Filter.CONDITIONS_BY_TYPE.keySet());
-		filterTypeButton.setSelectedValue(filter.type);
+		filterTypeButton.setValues(PortalListSettings.Filter.CONDITIONS_BY_TYPE.keySet());
+		filterTypeButton.setSelectedValue(filter.type());
 		filterHorizontalLayout.addChild(filterTypeButton, layoutSettings -> layoutSettings.alignVerticallyMiddle().paddingRight(PADDING));
 
 		filterConditionButton = new CycleButtonEx<>(BUTTON_HEIGHT, FILTER_CONDITION_BUTTON_WIDTH, this::stringifyEnumAsTranslatableKey);
 		filterConditionButton.setSortingComparator((o1, o2) -> Integer.compare(o1.ordinal(), o2.ordinal()));	// The enum is already in the same order as the columns of the list, so just use the ordinal value for simplicity.
-		filterConditionButton.setValues(Filter.CONDITIONS_BY_TYPE.get(filter.type));
-		filterConditionButton.setSelectedValue(filter.condition);
+		filterConditionButton.setValues(PortalListSettings.Filter.CONDITIONS_BY_TYPE.get(filter.type()));
+		filterConditionButton.setSelectedValue(filter.condition());
 		filterHorizontalLayout.addChild(filterConditionButton, layoutSettings -> layoutSettings.alignVerticallyMiddle().paddingRight(PADDING));
 
 		filterValueBox = new EditBox(font, 0, 0, 10, BUTTON_HEIGHT, CommonComponents.EMPTY);
 		filterValueBox.setMaxLength(256);
 		resizeFilterValueBox();
-		filterValueBox.setValue(filter.value);
+		filterValueBox.setValue(filter.value());
 		filterHorizontalLayout.addChild(filterValueBox, layoutSettings -> layoutSettings.alignVerticallyMiddle().paddingRight(PADDING));
 
-		filterHorizontalLayout.addChild(Button.builder(Component.translatable("config.apply"), this::applyFilter).width(APPLY_BUTTON_WIDTH).build(), layoutSettings -> layoutSettings.alignVerticallyMiddle().paddingRight(PADDING));
+		filterHorizontalLayout.addChild(Button.builder(APPLY_BUTTON_LABEL, this::applyFilter).width(APPLY_BUTTON_WIDTH).build(), layoutSettings -> layoutSettings.alignVerticallyMiddle().paddingRight(PADDING));
 
 		// Third row, containing text headers for the elements in the portal list. This LinearLayout is only used to get another row. In row, the positioning is done manually (see 'repositionLabels()').
 		LinearLayout thirdRow = LinearLayout.horizontal();
 		verticalLayout.addChild(thirdRow);
 
-		dimensionLabel = new PlainTextButton(0, 0, font.width(DIMENSION_HEADER.getVisualOrderText()), 9, DIMENSION_HEADER, _ -> onColumnLabelPressed(Sorting.Type.Dimension), font);
+		dimensionLabel = new PlainTextButton(0, 0, font.width(DIMENSION_HEADER.getVisualOrderText()), 9, DIMENSION_HEADER, _ -> onColumnLabelPressed(PortalListSettings.Sorting.Type.Dimension), font);
 		thirdRow.addChild(dimensionLabel);
-		locationLabel = new PlainTextButton(0, 0, font.width(LOCATION_HEADER.getVisualOrderText()), 9, LOCATION_HEADER, _ -> onColumnLabelPressed(Sorting.Type.Location), font);
+		locationLabel = new PlainTextButton(0, 0, font.width(LOCATION_HEADER.getVisualOrderText()), 9, LOCATION_HEADER, _ -> onColumnLabelPressed(PortalListSettings.Sorting.Type.Location), font);
 		thirdRow.addChild(locationLabel);
-		addressLabel = new PlainTextButton(0, 0, font.width(ADDRESS_HEADER.getVisualOrderText()), 9, ADDRESS_HEADER, _ -> onColumnLabelPressed(Sorting.Type.Address), font);
+		addressLabel = new PlainTextButton(0, 0, font.width(ADDRESS_HEADER.getVisualOrderText()), 9, ADDRESS_HEADER, _ -> onColumnLabelPressed(PortalListSettings.Sorting.Type.Address), font);
 		thirdRow.addChild(addressLabel);
-		powerLabel = new PlainTextButton(0, 0, font.width(POWER_HEADER.getVisualOrderText()), 9, POWER_HEADER, _ -> onColumnLabelPressed(Sorting.Type.Power), font);
+		powerLabel = new PlainTextButton(0, 0, font.width(POWER_HEADER.getVisualOrderText()), 9, POWER_HEADER, _ -> onColumnLabelPressed(PortalListSettings.Sorting.Type.Power), font);
 		thirdRow.addChild(powerLabel);
 	}
 
@@ -158,15 +159,15 @@ public class ListCommandGui extends Screen
 		layout.addToFooter(Button.builder(CommonComponents.GUI_DONE, button -> onClose()).width(200).build());	// Done button
 	}
 
-	private void onColumnLabelPressed(Sorting.Type type)
+	private void onColumnLabelPressed(PortalListSettings.Sorting.Type type)
 	{
-		minecraft.gui.setScreen(new ListCommandGui(portals, new GuiSettings((sorting.type == type) ? sorting.invert() : new Sorting(type), filter)));
+		minecraft.gui.setScreen(new PortalListScreen(portals, new PortalListSettings((sorting.type() == type) ? sorting.invert() : new PortalListSettings.Sorting(type), filter)));
 	}
 
 	private void applyFilter(Button button)
 	{
-		Filter filter = new Filter(filterTypeButton.getSelectedValue(), filterConditionButton.getSelectedValue(), filterValueBox.getValue());
-		minecraft.gui.setScreen(new ListCommandGui(portals, new GuiSettings(sorting, filter)));
+		PortalListSettings.Filter filter = new PortalListSettings.Filter(filterTypeButton.getSelectedValue(), filterConditionButton.getSelectedValue(), filterValueBox.getValue());
+		minecraft.gui.setScreen(new PortalListScreen(portals, new PortalListSettings(sorting, filter)));
 	}
 
 	private <T extends Enum<?>> String stringifyEnumAsTranslatableKey(T component)
@@ -215,7 +216,7 @@ public class ListCommandGui extends Screen
 		private static final int LEFT_RIGHT_BORDER = 20;
 		private final List<PortalInfo> portals;
 
-		public PortalList(List<PortalInfo> portals, Filter filter, Minecraft mc, int width, int height, int top, int itemHeight)
+		public PortalList(List<PortalInfo> portals, PortalListSettings.Filter filter, Minecraft mc, int width, int height, int top, int itemHeight)
 		{
 			super(mc, width, height, top, itemHeight);
 
@@ -244,11 +245,11 @@ public class ListCommandGui extends Screen
 			}
 		}
 
-		public void updateEntries(Filter filter)
+		public void updateEntries(PortalListSettings.Filter filter)
 		{
 			clearEntries();
 
-			switch (sorting.type)
+			switch (sorting.type())
 			{
 				// Descending order is achieved by swapping the input parameters to the comparator.
 				case Dimension -> this.portals.sort(Utils.invertComparator(sorting::isDescending, (o1, o2) -> o1.dimension().identifier().compareTo(o2.dimension().identifier())));
@@ -257,38 +258,38 @@ public class ListCommandGui extends Screen
 				case Power -> this.portals.sort(Utils.invertComparator(sorting::isDescending, (o1, o2) -> Integer.compare(o1.power(), o2.power())));
 			}
 
-			switch (filter.type)
+			switch (filter.type())
 			{
 				case Dimension:
-					switch (filter.condition)
+					switch (filter.condition())
 					{
-						case Equals   -> portals.stream().filter(portal -> portal.dimension().toString().equals(filter.value)).forEach(portal -> addEntry(new Entry(portal)));
-						case Contains -> portals.stream().filter(portal -> portal.dimension().toString().contains(filter.value)).forEach(portal -> addEntry(new Entry(portal)));
+						case Equals   -> portals.stream().filter(portal -> portal.dimension().toString().equals(filter.value())).forEach(portal -> addEntry(new Entry(portal)));
+						case Contains -> portals.stream().filter(portal -> portal.dimension().toString().contains(filter.value())).forEach(portal -> addEntry(new Entry(portal)));
 					}
 
 					break;
 
 				case Location:
-					switch (filter.condition)
+					switch (filter.condition())
 					{
-						case Equals   -> portals.stream().filter(portal -> Utils.getReadableBlockPos(portal.location()).equals(filter.value)).forEach(portal -> addEntry(new Entry(portal)));
-						case Contains -> portals.stream().filter(portal -> Utils.getReadableBlockPos(portal.location()).contains(filter.value)).forEach(portal -> addEntry(new Entry(portal)));
+						case Equals   -> portals.stream().filter(portal -> Utils.getReadableBlockPos(portal.location()).equals(filter.value())).forEach(portal -> addEntry(new Entry(portal)));
+						case Contains -> portals.stream().filter(portal -> Utils.getReadableBlockPos(portal.location()).contains(filter.value())).forEach(portal -> addEntry(new Entry(portal)));
 					}
 					break;
 
 				case Address:
-					switch (filter.condition)
+					switch (filter.condition())
 					{
-						case Equals   -> portals.stream().filter(portal -> portal.address().toString().equals(filter.value)).forEach(portal -> addEntry(new Entry(portal)));
-						case Contains -> portals.stream().filter(portal -> portal.address().toString().contains(filter.value)).forEach(portal -> addEntry(new Entry(portal)));
+						case Equals   -> portals.stream().filter(portal -> portal.address().toString().equals(filter.value())).forEach(portal -> addEntry(new Entry(portal)));
+						case Contains -> portals.stream().filter(portal -> portal.address().toString().contains(filter.value())).forEach(portal -> addEntry(new Entry(portal)));
 					}
 					break;
 
 				case Power:
 					try
 					{
-						int power = Integer.parseInt(filter.value);
-						switch (filter.condition)
+						int power = Integer.parseInt(filter.value());
+						switch (filter.condition())
 						{
 							case Equals      -> portals.stream().filter(portal -> portal.power() == power).forEach(portal -> addEntry(new Entry(portal)));
 							case LessThan    -> portals.stream().filter(portal -> portal.power()  < power).forEach(portal -> addEntry(new Entry(portal)));
@@ -331,9 +332,9 @@ public class ListCommandGui extends Screen
 		@Environment(EnvType.CLIENT)
 		public class Entry extends ContainerObjectSelectionList.Entry<PortalList.Entry>
 		{
-			private static final String I18N_GOTO_LOCATION_TOOLTIP = "config.goto_portal.tooltip";
-			private static final String I18N_SET_POWER_TOOLTIP = "config.set_power.tooltip";
-			private static final String I18N_DEACTIVATE_TOOLTIP = "config.deactivate.tooltip";
+			private static final String I18N_GOTO_LOCATION_TOOLTIP = I18N_PREFIX + "goto_portal" + I18N_TOOLTIP_SUFFIX;
+			private static final String I18N_SET_POWER_TOOLTIP     = I18N_PREFIX + "set_power" + I18N_TOOLTIP_SUFFIX;
+			private static final String I18N_DEACTIVATE_TOOLTIP    = I18N_PREFIX + "deactivate" + I18N_TOOLTIP_SUFFIX;
 
 			private final EditBox dimensionBox;
 			private final EditBox locationBox;
@@ -390,7 +391,7 @@ public class ListCommandGui extends Screen
 					try
 					{
 						int power = Integer.parseInt(powerBox.getValue());
-						ClientPlayNetworking.send(new SimplePortals.SetPortalPowerPayload(portal.dimension().identifier(), portal.location(), power, new GuiSettings(sorting, filter)));
+						ClientPlayNetworking.send(new SimplePortals.SetPortalPowerPayload(portal.dimension().identifier(), portal.location(), power, new PortalListSettings(sorting, filter)));
 					}
 					catch (NumberFormatException _) {}
 				});
@@ -401,7 +402,7 @@ public class ListCommandGui extends Screen
 				});
 
 				deactivateButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(Utils.createModIdentifier("deactivate_button"), Utils.createModIdentifier("deactivate_button_highlighted")), button -> {
-					ClientPlayNetworking.send(new SimplePortals.DeactivatePortalPayload(portal.dimension().identifier(), portal.location(), new GuiSettings(sorting, filter)));
+					ClientPlayNetworking.send(new SimplePortals.DeactivatePortalPayload(portal.dimension().identifier(), portal.location(), new PortalListSettings(sorting, filter)));
 				});
 
 				tooltipText = null;
@@ -512,139 +513,6 @@ public class ListCommandGui extends Screen
 				return ImmutableList.of(dimensionBox, locationBox, addressBox, addressBlockDisplays.get(0), addressBlockDisplays.get(1), addressBlockDisplays.get(2), addressBlockDisplays.get(3), powerBox, setPowerButton, gotoLocationButton, deactivateButton);
 			}
 		}
-	}
-
-	public record Sorting(Type type, Direction direction)
-	{
-		public static final Sorting DEFAULT = new Sorting(Type.Address);
-
-		public Sorting(Type type)
-		{
-			this(type, Direction.Ascending);
-		}
-
-		public Sorting invert()
-		{
-			return new Sorting(type, (direction == Direction.Ascending) ? Direction.Descending : Direction.Ascending);
-		}
-
-		public boolean isDescending() { return direction == Direction.Descending; }
-
-		public enum Type
-		{
-			Dimension,
-			Location,
-			Address,
-			Power
-		}
-
-		public enum Direction
-		{
-			Ascending,
-			Descending
-		}
-
-		public static final StreamCodec<FriendlyByteBuf, Sorting> STREAM_CODEC = new StreamCodec<FriendlyByteBuf, Sorting>()
-		{
-			@Override
-			public Sorting decode(FriendlyByteBuf input)
-			{
-				return new Sorting(input.readEnum(Type.class), input.readEnum(Direction.class));
-			}
-
-			@Override
-			public void encode(FriendlyByteBuf output, Sorting value)
-			{
-				output.writeEnum(value.type);
-				output.writeEnum(value.direction);
-			}
-		};
-	}
-
-	public record Filter(Type type, Condition condition, String value)
-	{
-		public static final Filter NONE = new Filter(Filter.Type.None, Filter.Condition.None, "");
-		public static final Multimap<Type, Condition> CONDITIONS_BY_TYPE;
-
-		static
-		{
-			var conditionsByType = ArrayListMultimap.<Type, Condition>create();
-			conditionsByType.put(Type.None, Condition.None);
-
-			conditionsByType.put(Type.Dimension, Condition.Equals);
-			conditionsByType.put(Type.Dimension, Condition.Contains);
-
-			conditionsByType.put(Type.Location, Condition.Equals);
-			conditionsByType.put(Type.Location, Condition.Contains);
-
-			conditionsByType.put(Type.Address, Condition.Equals);
-			conditionsByType.put(Type.Address, Condition.Contains);
-
-			conditionsByType.put(Type.Power, Condition.Equals);
-			conditionsByType.put(Type.Power, Condition.GreaterThan);
-			conditionsByType.put(Type.Power, Condition.LessThan);
-
-			CONDITIONS_BY_TYPE = ImmutableListMultimap.copyOf(conditionsByType);
-		}
-
-		// The ordering of the enum values should reflect the order of columns in the list. Otherwise,
-		// the cycle button for setting up the filter will have a different order than the columns.
-		// It uses the ordinal values for ordering.
-		public enum Type
-		{
-			None,
-			Dimension,
-			Location,
-			Address,
-			Power
-		}
-
-		public enum Condition
-		{
-			None,
-			Equals,
-			GreaterThan,
-			LessThan,
-			Contains
-		}
-
-		public static final StreamCodec<FriendlyByteBuf, Filter> STREAM_CODEC = new StreamCodec<FriendlyByteBuf, Filter>()
-		{
-			@Override
-			public Filter decode(FriendlyByteBuf input)
-			{
-				return new Filter(input.readEnum(Type.class), input.readEnum(Condition.class), input.readUtf());
-			}
-
-			@Override
-			public void encode(FriendlyByteBuf output, Filter value)
-			{
-				output.writeEnum(value.type);
-				output.writeEnum(value.condition);
-				output.writeUtf(value.value);
-			}
-		};
-	}
-
-	public record GuiSettings(Sorting sorting, Filter filter)
-	{
-		public static final GuiSettings DEFAULT = new GuiSettings(Sorting.DEFAULT, Filter.NONE);
-
-		public static StreamCodec<FriendlyByteBuf, GuiSettings> STREAM_CODEC = new StreamCodec<FriendlyByteBuf, GuiSettings>()
-		{
-			@Override
-			public GuiSettings decode(FriendlyByteBuf input)
-			{
-				return new GuiSettings(Sorting.STREAM_CODEC.decode(input), Filter.STREAM_CODEC.decode(input));
-			}
-
-			@Override
-			public void encode(FriendlyByteBuf output, GuiSettings value)
-			{
-				Sorting.STREAM_CODEC.encode(output, value.sorting);
-				Filter.STREAM_CODEC.encode(output, value.filter);
-			}
-		};
 	}
 
 }

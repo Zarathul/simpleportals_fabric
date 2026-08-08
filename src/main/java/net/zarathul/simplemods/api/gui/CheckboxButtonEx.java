@@ -1,4 +1,4 @@
-package net.zarathul.simpleportals.configuration.gui;
+package net.zarathul.simplemods.api.gui;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
