@@ -1,37 +1,38 @@
 {
-  "schemaVersion": 1,
-  "id": "simplemodslib",
-  "version": "${version}",
+	"schemaVersion": 1,
+	"id": "simplemodslib",
+	"version": "${version}",
 
-  "name": "Simple Mods Library",
-  "description": "SimpleModsLib is a minecraft mod library used by my other mods.",
-  "authors": [
-    "Zarathul"
-  ],
-  "contact": {
-    "homepage": "https://github.com/Zarathul/simplemodslib_fabric/",
-    "sources": "https://github.com/Zarathul/simplemodslib_fabric/"
-  },
+	"name": "Simple Mods Library",
+	"description": "SimpleModsLib is a minecraft mod library used by my other mods.",
+	"authors": [
+		"Zarathul"
+	],
+	"contact": {
+		"homepage": "https://github.com/Zarathul/simplemodslib_fabric/",
+		"sources": "https://github.com/Zarathul/simplemodslib_fabric/"
+	},
 
-  "license": "MIT",
-  "icon": "",
+	"license": "MIT",
+	"icon": "assets/simplemodslib/textures/block/logo.png",
 
-  "environment": "*",
-  "entrypoints": {
-    "main": [
-      "net.zarathul.simplemodslib.SimpleModsLib"
-    ],
-    "client": [
-      "net.zarathul.simplemodslib.SimpleModsLibClient"
-    ]
-  },
-  "mixins": [
-  ],
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"net.zarathul.simplemodslib.SimpleModsLib"
+		],
+		"client": [
+			"net.zarathul.simplemodslib.SimpleModsLibClient"
+		]
+	},
+	"mixins": [
+		"simplemodslib.mixins.json"
+	],
 
-  "depends": {
-    "fabricloader": ">=0.19.3",
-    "minecraft": "~26.2",
-    "java": ">=25",
-    "fabric-api": "*"
-  }
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
 }
