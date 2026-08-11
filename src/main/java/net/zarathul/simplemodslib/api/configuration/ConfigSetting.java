@@ -89,6 +89,11 @@ public class ConfigSetting
 			return value >= 0;
 		};
 
+	public static final Function<Object, Boolean> INT_GREATER_OR_EQUAL_TO_MINUS_ONE = o -> {
+			int value = (int)o;
+			return value >= -1;
+		};
+
 	public static Function<Object, Boolean> INT_BETWEEN(int startInclusive, int endInclusive)
 	{
 		return o -> {
@@ -99,12 +104,17 @@ public class ConfigSetting
 
 	public static final Function<Object, Boolean> FLOAT_GREATER_THAN_ZERO = o -> {
 			float value = (float)o;
-			return value > 0;
+			return value > 0f;
 		};
 
 	public static final Function<Object, Boolean> FLOAT_GREATER_OR_EQUAL_TO_ZERO = o -> {
 			float value = (float)o;
-			return value >= 0;
+			return value >= 0f;
+		};
+
+	public static final Function<Object, Boolean> FLOAT_GREATER_OR_EQUAL_TO_MINUS_ONE = o -> {
+			float value = (float)o;
+			return value >= -1f;
 		};
 
 	public static Function<Object, Boolean> FLOAT_BETWEEN(float startInclusive, float endInclusive)
