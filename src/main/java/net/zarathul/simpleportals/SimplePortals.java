@@ -32,6 +32,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.zarathul.simplemodslib.SimpleModsLib;
 import net.zarathul.simplemodslib.api.configuration.Config;
 import net.zarathul.simpleportals.blocks.BlockPortal;
 import net.zarathul.simpleportals.blocks.BlockPortalFrame;
@@ -59,7 +60,6 @@ public class SimplePortals implements ModInitializer
 {
 	// ids and titles
 	public static final String MOD_ID = "simpleportals";
-	public static final String SIMPLE_MODS_ID = "simplemods";
 	public static final String CONFIG_GUI_TITLE = "§nSimplePortals";
 
 	// block and item names
@@ -69,11 +69,6 @@ public class SimplePortals implements ModInitializer
 	public static final String ITEM_PORTAL_FRAME_NAME = "portal_frame";
 	public static final String ITEM_POWER_GAUGE_NAME = "power_gauge";
 	public static final String ITEM_PORTAL_ACTIVATOR_NAME = "portal_activator";
-
-	// creative tab
-	public static final String CREATIVE_MODE_TAB_TITLE = "Simple Mods";
-	public static final Identifier CREATIVE_MODE_TAB_ID = Identifier.fromNamespaceAndPath(SIMPLE_MODS_ID, "creative_tab");
-	public static final CreativeModeTab creativeTab = MakeCreativeTab();
 
 	// blocks
 	public static final BlockPortal blockPortal = new BlockPortal(createBlockKey(BLOCK_PORTAL_NAME));
@@ -90,8 +85,6 @@ public class SimplePortals implements ModInitializer
 
 	// portal registry
 	public static PortalRegistry portalRegistry;
-
-	public static boolean onDedicatedServer;
 
 	@Override
 	public void onInitialize()
@@ -110,8 +103,9 @@ public class SimplePortals implements ModInitializer
 
 		Registry.register(BuiltInRegistries.ITEM, Utils.createModIdentifier(ITEM_PORTAL_ACTIVATOR_NAME), itemPortalActivator);
 
-		// Register creative tab.
-		Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, CREATIVE_MODE_TAB_ID, creativeTab);
+		SimpleModsLib.creativeModeTabItems.add(itemPortalFrame);
+		SimpleModsLib.creativeModeTabItems.add(itemPowerGauge);
+		SimpleModsLib.creativeModeTabItems.add(itemPortalActivator);
 
 		// Register packet handlers.
 		registerCustomPackerHandlers();
@@ -252,6 +246,8 @@ public class SimplePortals implements ModInitializer
 
 			Portal targetPortal = portals.getFirst();
 			portalRegistry.setPower(targetPortal, payload.value);
+			portalRegistry.updatePowerGauges(ctx.server().getLevel(dimension), targetPortal);
+
 			ListCommandPayload.send(player, payload.portalListSettings);
 		});
 
@@ -299,23 +295,6 @@ public class SimplePortals implements ModInitializer
 	private static ResourceKey<Item> createItemKey(String name)
 	{
 		return ResourceKey.create(Registries.ITEM, Utils.createModIdentifier(name));
-	}
-
-	public static CreativeModeTab MakeCreativeTab()
-	{
-		var simpleModsTab = BuiltInRegistries.CREATIVE_MODE_TAB.get(CREATIVE_MODE_TAB_ID);
-
-		if (simpleModsTab.isPresent()) return simpleModsTab.get().value();
-
-		return FabricCreativeModeTab.builder()
-			.title(Component.literal(CREATIVE_MODE_TAB_TITLE))
-			.icon(() -> new ItemStack(blockPortalFrame))
-			.displayItems((parameters, output) -> {
-				output.accept(itemPortalFrame);
-				output.accept(itemPowerGauge);
-				output.accept(itemPortalActivator);
-			})
-			.build();
 	}
 
 	// Custom packets

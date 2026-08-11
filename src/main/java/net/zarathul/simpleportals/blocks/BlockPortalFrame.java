@@ -17,6 +17,7 @@ import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.SingleThreadedRandomSource;
 import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.level.redstone.Orientation;
 import net.minecraft.world.phys.BlockHitResult;
 import net.zarathul.simpleportals.Settings;
@@ -41,7 +42,8 @@ public class BlockPortalFrame extends Block
 			.mapColor(MapColor.COLOR_BLACK)
 			.strength(50.0f, 200.0f)
 			.sound(SoundType.STONE)
-			.requiresCorrectToolForDrops());
+			.requiresCorrectToolForDrops()
+			.pushReaction(PushReaction.BLOCK));
 	}
 
 	@Override
