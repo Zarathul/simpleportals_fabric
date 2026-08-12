@@ -61,7 +61,7 @@ public class CommandPortals
 			})
 			.then(
 				Commands.literal("config")
-				.executes(Config::executeCommand)
+				.executes(context -> Config.executeCommand(context, SimplePortals.MOD_ID))
 			)
 			.then(
 				Commands.literal("list")

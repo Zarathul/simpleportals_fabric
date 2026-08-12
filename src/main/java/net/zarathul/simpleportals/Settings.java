@@ -25,17 +25,17 @@ public final class Settings
 	public static final Identifier TRANSITION_EFFECT_ENABLED = Utils.createModIdentifier("transition_effect_enabled");
 
 	public static TagKey<Item> powerSourceTag() { return powerSourceTag; }
-	public static int maxSize() { return (int) Config.getSetting(MAX_SIZE).get().value; }
-	public static int powerCost() { return (int) Config.getSetting(POWER_COST).get().value; }
-	public static int powerCapacity() { return (int) Config.getSetting(POWER_CAPACITY).get().value; }
-	public static int playerTeleportationDelay() { return (int) Config.getSetting(PLAYER_TELEPORTATION_DELAY).get().value; }
-	public static Identifier powerSource() { return (Identifier) Config.getSetting(POWER_SOURCE).get().value; }
-	public static boolean teleportationSoundEnabled() { return (boolean) Config.getSetting(TELEPORTATION_SOUND_ENABLED).get().value; }
-	public static boolean portalActivationSoundEnabled() { return (boolean) Config.getSetting(PORTAL_ACTIVATION_SOUND_ENABLED).get().value; }
-	public static boolean notEnoughPowerSoundEnabled() { return (boolean) Config.getSetting(NOT_ENOUGH_POWER_SOUND_ENABLED).get().value; }
-	public static boolean particlesEnabled() { return (boolean) Config.getSetting(PARTICLES_ENABLED).get().value; }
-	public static boolean ambientSoundEnabled() { return (boolean) Config.getSetting(AMBIENT_SOUND_ENABLED).get().value; }
-	public static boolean transitionEffectEnabled() { return (boolean) Config.getSetting(TRANSITION_EFFECT_ENABLED).get().value; }
+	public static int maxSize() { return (int) Config.getSetting(MAX_SIZE).value; }
+	public static int powerCost() { return (int) Config.getSetting(POWER_COST).value; }
+	public static int powerCapacity() { return (int) Config.getSetting(POWER_CAPACITY).value; }
+	public static int playerTeleportationDelay() { return (int) Config.getSetting(PLAYER_TELEPORTATION_DELAY).value; }
+	public static Identifier powerSource() { return (Identifier) Config.getSetting(POWER_SOURCE).value; }
+	public static boolean teleportationSoundEnabled() { return (boolean) Config.getSetting(TELEPORTATION_SOUND_ENABLED).value; }
+	public static boolean portalActivationSoundEnabled() { return (boolean) Config.getSetting(PORTAL_ACTIVATION_SOUND_ENABLED).value; }
+	public static boolean notEnoughPowerSoundEnabled() { return (boolean) Config.getSetting(NOT_ENOUGH_POWER_SOUND_ENABLED).value; }
+	public static boolean particlesEnabled() { return (boolean) Config.getSetting(PARTICLES_ENABLED).value; }
+	public static boolean ambientSoundEnabled() { return (boolean) Config.getSetting(AMBIENT_SOUND_ENABLED).value; }
+	public static boolean transitionEffectEnabled() { return (boolean) Config.getSetting(TRANSITION_EFFECT_ENABLED).value; }
 
 	public static void init()
 	{
