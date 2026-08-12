@@ -20,6 +20,7 @@ import net.minecraft.world.entity.player.Player;
 import net.zarathul.simplemodslib.SimpleModsLib;
 import net.zarathul.simplemodslib.api.gui.CheckboxButtonEx;
 import net.zarathul.simplemodslib.api.gui.CycleButtonEx;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Arrays;
 import java.util.Comparator;
@@ -31,7 +32,7 @@ import java.util.stream.Collectors;
 public class ConfigScreen extends Screen
 {
 	private SettingsList settingsList;
-	private List<ConfigSetting> settings;
+	private final List<ConfigSetting> settings;
 	private final String configName;
 	private final Player player;
 	private final Consumer<Player> syncChanges;
@@ -91,8 +92,8 @@ public class ConfigScreen extends Screen
 		LinearLayout horizontalLayout = layout.addToFooter(LinearLayout.horizontal());
 		horizontalLayout.spacing(PADDING);
 
-		horizontalLayout.addChild(Button.builder(CommonComponents.GUI_BACK, button -> onClose()).width(200).build());	// Cancel button
-		horizontalLayout.addChild(Button.builder(Component.translatable(I18N_SAVE), button -> saveConfigAndCloseScreen()).width(200).build());	// Done button
+		horizontalLayout.addChild(Button.builder(CommonComponents.GUI_BACK, _ -> onClose()).width(200).build());	// Cancel button
+		horizontalLayout.addChild(Button.builder(Component.translatable(I18N_SAVE), _ -> saveConfigAndCloseScreen()).width(200).build());	// Done button
 	}
 
 	private void saveConfigAndCloseScreen()
@@ -124,7 +125,7 @@ public class ConfigScreen extends Screen
 		}
 
 		@Override
-		protected void extractTooltipForNextRenderPass(GuiGraphicsExtractor graphics, int mouseX, int mouseY)
+		protected void extractTooltipForNextRenderPass(@NonNull GuiGraphicsExtractor graphics, int mouseX, int mouseY)
 		{
 			super.extractTooltipForNextRenderPass(graphics, mouseX, mouseY);
 
@@ -190,7 +191,7 @@ public class ConfigScreen extends Screen
 		// editboxes at the end.
 		private static Comparator<ConfigSetting> getSettingComparator()
 		{
-			return Comparator.<ConfigSetting, String>comparing(setting -> getLocalizedCategory((ConfigSetting)setting))
+			return Comparator.comparing(SettingsList::getLocalizedCategory)
 				.thenComparing((o1, o2) -> {
 					if (o1.valueType == o2.valueType) return 0;
 					if (o1.isBoolean()) return -1;
@@ -218,7 +219,7 @@ public class ConfigScreen extends Screen
 		}
 
 		@Environment(EnvType.CLIENT)
-		public abstract class Entry extends ContainerObjectSelectionList.Entry<Entry>
+		public abstract static class Entry extends ContainerObjectSelectionList.Entry<Entry>
 		{
 			public abstract void commitChanges();
 			public abstract String getTooltip();
@@ -235,7 +236,7 @@ public class ConfigScreen extends Screen
 			}
 
 			@Override
-			public void extractContent(GuiGraphicsExtractor graphics, int mouseX, int mouseY, boolean hovered, float a)
+			public void extractContent(@NonNull GuiGraphicsExtractor graphics, int mouseX, int mouseY, boolean hovered, float a)
 			{
 				int xPos = centerIn(0, width, categoryHeader.getWidth());
 				int yPos = centerIn(getContentY(), ENTRY_HEIGHT, categoryHeader.getHeight());
@@ -261,13 +262,13 @@ public class ConfigScreen extends Screen
 			}
 
 			@Override
-			public List<? extends NarratableEntry> narratables()
+			public @NonNull List<? extends NarratableEntry> narratables()
 			{
 				return List.of();
 			}
 
 			@Override
-			public List<? extends GuiEventListener> children()
+			public @NonNull List<? extends GuiEventListener> children()
 			{
 				return List.of(categoryHeader);
 			}
@@ -328,17 +329,18 @@ public class ConfigScreen extends Screen
 					editBox.setEditable(widgetIsActive);
 					editBox.active = widgetIsActive;
 					editBox.setValue(setting.value.toString());
+					editBox.moveCursorToStart(false);
 					widgetNeedsValidation = true;
 				}
 
-				resetButton = new ImageButton(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, new WidgetSprites(Identifier.fromNamespaceAndPath(SimpleModsLib.MOD_ID, "reset_button"), Identifier.fromNamespaceAndPath(SimpleModsLib.MOD_ID, "reset_button_highlighted")), button -> resetValue());
+				resetButton = new ImageButton(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, new WidgetSprites(Identifier.fromNamespaceAndPath(SimpleModsLib.MOD_ID, "reset_button"), Identifier.fromNamespaceAndPath(SimpleModsLib.MOD_ID, "reset_button_highlighted")), _ -> resetValue());
 				resetButton.active = widgetIsActive;
 
-				needsWorldRestartButton = new ImageButton(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, new WidgetSprites(Identifier.withDefaultNamespace("icon/link"), Identifier.withDefaultNamespace("icon/link_highlighted")), (b) -> {});
+				needsWorldRestartButton = new ImageButton(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, new WidgetSprites(Identifier.withDefaultNamespace("icon/link"), Identifier.withDefaultNamespace("icon/link_highlighted")), _ -> {});
 				needsWorldRestartButton.active = false;
 				needsWorldRestartButton.visible = setting.needsWorldRestart;
 
-				validatedButton = new ImageButton(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, new WidgetSprites(Identifier.withDefaultNamespace("world_list/error_highlighted"), Identifier.withDefaultNamespace("world_list/error")), (b) -> {});
+				validatedButton = new ImageButton(0, 0, BUTTON_HEIGHT, BUTTON_HEIGHT, new WidgetSprites(Identifier.withDefaultNamespace("world_list/error_highlighted"), Identifier.withDefaultNamespace("world_list/error")), _ -> {});
 				validatedButton.active = false;
 				validatedButton.visible = widgetNeedsValidation;
 
@@ -346,7 +348,7 @@ public class ConfigScreen extends Screen
 			}
 
 			@Override
-			public void extractContent(GuiGraphicsExtractor graphics, int mouseX, int mouseY, boolean hovered, float a)
+			public void extractContent(@NonNull GuiGraphicsExtractor graphics, int mouseX, int mouseY, boolean hovered, float a)
 			{
 				int centerX = width / 2;
 				settingLabel.setPosition(centerX - settingLabel.getWidth() - PADDING, centerIn(getContentY(), ENTRY_HEIGHT, settingLabel.getHeight()));
@@ -438,22 +440,22 @@ public class ConfigScreen extends Screen
 							case Int ->
 							{
 								int parsedValue = Integer.parseInt(inputText);
-								if (setting.isValid(parsedValue)) setting.value = parsedValue;
+								if (setting.isValidValue(parsedValue)) setting.value = parsedValue;
 							}
 							case Float ->
 							{
 								float parsedValue = Float.parseFloat(inputText);
-								if (setting.isValid(parsedValue)) setting.value = parsedValue;
+								if (setting.isValidValue(parsedValue)) setting.value = parsedValue;
 							}
 							case String ->
 							{
-								if (setting.isValid(inputText)) setting.value = inputText;
+								if (setting.isValidValue(inputText)) setting.value = inputText;
 							}
 
 							case Complex ->
 							{
 								Object parsedValue = setting.destringify(inputText);
-								if (setting.isValid(parsedValue)) setting.value = parsedValue;
+								if (setting.isValidValue(parsedValue)) setting.value = parsedValue;
 							}
 						}
 					}
@@ -485,11 +487,11 @@ public class ConfigScreen extends Screen
 
 			private void validateTextFieldInput(String text)
 			{
-				isValid = setting.validator.isEmpty();
+				isValid = (setting.validator == null);
 
 				if (!isValid)
 				{
-					var validator = setting.validator.get();
+					var validator = setting.validator;
 
 					try
 					{
@@ -518,13 +520,13 @@ public class ConfigScreen extends Screen
 			}
 
 			@Override
-			public List<? extends NarratableEntry> narratables()
+			public @NonNull List<? extends NarratableEntry> narratables()
 			{
 				return List.of();
 			}
 
 			@Override
-			public List<? extends GuiEventListener> children()
+			public @NonNull List<? extends GuiEventListener> children()
 			{
 				return List.of(settingLabel, editBox, checkBox, enumButton, resetButton, needsWorldRestartButton, validatedButton);
 			}
@@ -537,8 +539,9 @@ public class ConfigScreen extends Screen
 	 * @param offset
 	 * Offest at which the container resides.
 	 * @param containerSize
-	 * Size of the container.
+	 * The width or height of the container.
 	 * @param objectSize
+	 * The width or height of the object.
 	 * @return
 	 * May return a negative value, in case the object size is bigger than the container.
 	 */

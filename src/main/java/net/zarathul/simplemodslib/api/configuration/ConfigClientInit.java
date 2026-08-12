@@ -29,23 +29,26 @@ public final class ConfigClientInit
 			if (fromRemoteServer)
 			{
 				Config.readServerSettings(fromRemoteServer, payload.values(), ctx.player());
-				settings = Config.getMergedSettings(payload.values());
+				settings = Config.getMergedSettings(payload.modId(), payload.values());
 			}
 			else
 			{
-				settings = Config.getSettings();
+				settings = Config.getSettings(payload.modId());
 			}
 
-			client.execute(() -> client.gui.setScreen(new ConfigScreen(settings, Component.literal(Config.getConfigGuiTitle()), Config.getModId(), client.player, player -> {
+			Config.ModInfo modInfo = Config.getModInfo(payload.modId());
+			if (modInfo == null) return;
+
+			client.execute(() -> client.gui.setScreen(new ConfigScreen(settings, Component.literal(modInfo.configGuiTitle()), payload.modId(), client.player, player -> {
 				// Send the potentially edited settings back to the server. But only if they came from a server in the first place.
 				if (fromRemoteServer)
 				{
 					List<Config.ConfigValue> configValues = new ArrayList<>();
-					Config.writeServerSettings(fromRemoteServer, configValues, player);
+					Config.writeServerSettings(payload.modId(), fromRemoteServer, configValues, player);
 
 					if (!configValues.isEmpty())
 					{
-						Config.ConfigCommandPayload outgoingPayload = new Config.ConfigCommandPayload(configValues, false);
+						Config.ConfigCommandPayload outgoingPayload = new Config.ConfigCommandPayload(payload.modId(), configValues, false);
 						ClientPlayNetworking.send(outgoingPayload);
 					}
 				}
