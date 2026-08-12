@@ -8,7 +8,6 @@ import net.fabricmc.api.Environment;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.FriendlyByteBuf;
@@ -36,10 +35,10 @@ import java.util.function.Function;
 /**
  * Loads and stores arbitrary settings. Optionally, provides UI for editing with server synchronization.<br><br>
  * Things to note:<br>
- * - {@link Config#initialize(String, String, boolean, AddSettingsCallback)} must be called before anything else. Refer to method documentation for details.<br>
+ * - {@link Config#initialize(String, String, boolean, AddSettingsCallback)} must be called per mod and before anything else. Refer to method documentation for details.<br>
  * - Using the config UI requires setting up networking ({@link Config#registerServerSideNetworking()}, {@link Config#registerClientSideNetworking()} and a
- * way to send the custom packet to the client. E.g. a command, see: {@link Config#registerCommand(CommandDispatcher, CommandBuildContext, Commands.CommandSelection)} and
- * {@link Config#executeCommand(CommandContext)}.<br>
+ * way to send the custom packet to the client. E.g. a command, see: {@link Config#registerCommand(CommandDispatcher, String)} and
+ * {@link Config#executeCommand(CommandContext, String)}.<br>
  * - Localization keys for settings and their tooltips are constructed as follows:<br>
  * -- {@code config.} and {@link ConfigSetting#descriptionKey}, for tooltips appended by {@code .tooltip}. (e.g. {@code config.mysettings_desctiptionkey} and {@code config.mysettings_desctiptionkey.tooltip})<br>
  * -- If a key was not provided, the path of the settings id is used. The other rules still apply. (e.g. from the id {@code "mymodid:mysetting"} you'll get {@code config.mysetting} and {@code config.mysetting.tooltip})<br>
@@ -50,6 +49,9 @@ public final class Config
 	private static final Logger LOG = LogManager.getLogger(SimpleModsLib.MOD_ID);
 	private static final Map<Identifier, ConfigSetting> registry = new HashMap<>();
 	private static final Map<Identifier, ConfigSetting> serverRegistry = new HashMap<>();
+	private static final Map<String, ModInfo> modInfos = new HashMap<>();
+	private static boolean isServerSideNetworkingRegistered;
+	private static boolean isClientSideNetworkingRegistered;
 	private static final String DEFAULT_CATEGORY = "";
 
 	public static final String I18N_CONFIG_PREFIX = "config.";
@@ -57,9 +59,9 @@ public final class Config
 
 	public static Map<Identifier, ConfigSetting> getRegistry() { return Collections.unmodifiableMap(registry); }
 
-	public static Optional<ConfigSetting> getSetting(Identifier id)
+	public static ConfigSetting getSetting(Identifier id)
 	{
-		return (registry.containsKey(id)) ? Optional.of(registry.get(id)) : Optional.empty();
+		return registry.getOrDefault(id, null);
 	}
 
 	public static boolean setSettingValue(Identifier id, Object value)
@@ -70,12 +72,7 @@ public final class Config
 		return true;
 	}
 
-	private static String modId;
-	private static String configGuiTitle;
-	private static boolean onDedicatedServer;
-
-	public static String getModId() { return modId; }
-	public static String getConfigGuiTitle() { return configGuiTitle; }
+	public static ModInfo getModInfo(String modId) { return modInfos.getOrDefault(modId, null); }
 
 	private Config() {}
 
@@ -87,11 +84,13 @@ public final class Config
 	 * @return
 	 * The merged list of {@link ConfigSetting}s.
 	 */
-	public static List<ConfigSetting> getMergedSettings(List<ConfigValue> receivedServerValues)
+	public static List<ConfigSetting> getMergedSettings(String modId, List<ConfigValue> receivedServerValues)
 	{
 		List<ConfigSetting> settings = new ArrayList<>(registry.size());
 
-		registry.values().stream().filter(setting -> setting.clientOnly).forEach(settings::add);
+		registry.values().stream()
+			.filter(setting -> (setting.id.getNamespace().equals(modId) && setting.clientOnly))
+			.forEach(settings::add);
 		// Since the server will only send ConfigValues for settings the player has the required permissions for,
 		// those can be used to filter out the other settings and not show them in the gui.
 		receivedServerValues.forEach(configValue -> {
@@ -101,18 +100,20 @@ public final class Config
 		return settings;
 	}
 
-	public static List<ConfigSetting> getSettings()
+	public static List<ConfigSetting> getSettings(String modId)
 	{
 		List<ConfigSetting> settings = new ArrayList<>(registry.size());
-		settings.addAll(registry.values());
+		registry.values().stream()
+			.filter(setting -> setting.id.getNamespace().equals(modId))
+			.forEach(settings::add);
 
 		return settings;
 	}
 
-	private static boolean addInt(
+	public static boolean addInt(
 		Identifier id,
 		int defaultValue,
-		Optional<Function<Object, Boolean>> validator,
+		Function<Object, Boolean> validator,
 		String description,
 		String descriptionKey,
 		String category,
@@ -143,26 +144,12 @@ public final class Config
 		int defaultValue,
 		Function<Object, Boolean> validator,
 		String description,
-		String descriptionKey,
 		String category,
 		boolean needsWorldRestart,
 		int permissionLvl,
 		boolean clientOnly)
 	{
-		return addInt(id, defaultValue, Optional.of(validator), description, descriptionKey, category, needsWorldRestart, permissionLvl, clientOnly);
-	}
-
-	public static boolean addInt(
-		Identifier id,
-		int defaultValue,
-		Function<Object, Boolean> validator,
-		String description,
-		String category,
-		boolean needsWorldRestart,
-		int permissionLvl,
-		boolean clientOnly)
-	{
-		return addInt(id, defaultValue, Optional.of(validator), description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
+		return addInt(id, defaultValue, validator, description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
 	}
 
 	public static boolean addInt(
@@ -174,7 +161,7 @@ public final class Config
 		int permissionLvl,
 		boolean clientOnly)
 	{
-		return addInt(id, defaultValue, Optional.empty(), description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
+		return addInt(id, defaultValue, null, description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
 	}
 
 	public static boolean addInt(
@@ -185,13 +172,13 @@ public final class Config
 		int permissionLvl,
 		boolean clientOnly)
 	{
-		return addInt(id, defaultValue, Optional.empty(), description, id.getPath(), DEFAULT_CATEGORY, needsWorldRestart, permissionLvl, clientOnly);
+		return addInt(id, defaultValue, null, description, id.getPath(), DEFAULT_CATEGORY, needsWorldRestart, permissionLvl, clientOnly);
 	}
 
-	private static boolean addFloat(
+	public static boolean addFloat(
 		Identifier id,
 		float defaultValue,
-		Optional<Function<Object, Boolean>> validator,
+		Function<Object, Boolean> validator,
 		String description,
 		String descriptionKey,
 		String category,
@@ -222,26 +209,12 @@ public final class Config
 		float defaultValue,
 		Function<Object, Boolean> validator,
 		String description,
-		String descriptionKey,
 		String category,
 		boolean needsWorldRestart,
 		int permissionLvl,
 		boolean clientOnly)
 	{
-		return addFloat(id, defaultValue, Optional.of(validator), description, descriptionKey, category, needsWorldRestart, permissionLvl, clientOnly);
-	}
-
-	public static boolean addFloat(
-		Identifier id,
-		float defaultValue,
-		Function<Object, Boolean> validator,
-		String description,
-		String category,
-		boolean needsWorldRestart,
-		int permissionLvl,
-		boolean clientOnly)
-	{
-		return addFloat(id, defaultValue, Optional.of(validator), description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
+		return addFloat(id, defaultValue, validator, description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
 	}
 
 	public static boolean addFloat(
@@ -253,7 +226,7 @@ public final class Config
 		int permissionLvl,
 		boolean clientOnly)
 	{
-		return addFloat(id, defaultValue, Optional.empty(), description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
+		return addFloat(id, defaultValue, null, description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
 	}
 
 	public static boolean addFloat(
@@ -264,13 +237,13 @@ public final class Config
 		int permissionLvl,
 		boolean clientOnly)
 	{
-		return addFloat(id, defaultValue, Optional.empty(), description, id.getPath(), DEFAULT_CATEGORY, needsWorldRestart, permissionLvl, clientOnly);
+		return addFloat(id, defaultValue, null, description, id.getPath(), DEFAULT_CATEGORY, needsWorldRestart, permissionLvl, clientOnly);
 	}
 
-	private static boolean addBool(
+	public static boolean addBool(
 		Identifier id,
 		boolean defaultValue,
-		Optional<Function<Object, Boolean>> validator,
+		Function<Object, Boolean> validator,
 		String description,
 		String descriptionKey,
 		String category,
@@ -301,26 +274,12 @@ public final class Config
 		boolean defaultValue,
 		Function<Object, Boolean> validator,
 		String description,
-		String descriptionKey,
 		String category,
 		boolean needsWorldRestart,
 		int permissionLvl,
 		boolean clientOnly)
 	{
-		return addBool(id, defaultValue, Optional.of(validator), description, descriptionKey, category, needsWorldRestart, permissionLvl, clientOnly);
-	}
-
-	public static boolean addBool(
-		Identifier id,
-		boolean defaultValue,
-		Function<Object, Boolean> validator,
-		String description,
-		String category,
-		boolean needsWorldRestart,
-		int permissionLvl,
-		boolean clientOnly)
-	{
-		return addBool(id, defaultValue, Optional.of(validator), description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
+		return addBool(id, defaultValue, validator, description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
 	}
 
 	public static boolean addBool(
@@ -332,7 +291,7 @@ public final class Config
 		int permissionLvl,
 		boolean clientOnly)
 	{
-		return addBool(id, defaultValue, Optional.empty(), description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
+		return addBool(id, defaultValue, null, description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
 	}
 
 	public static boolean addBool(
@@ -343,13 +302,13 @@ public final class Config
 		int permissionLvl,
 		boolean clientOnly)
 	{
-		return addBool(id, defaultValue, Optional.empty(), description, id.getPath(), DEFAULT_CATEGORY, needsWorldRestart, permissionLvl, clientOnly);
+		return addBool(id, defaultValue, null, description, id.getPath(), DEFAULT_CATEGORY, needsWorldRestart, permissionLvl, clientOnly);
 	}
 
-	private static boolean addString(
+	public static boolean addString(
 		Identifier id,
 		String defaultValue,
-		Optional<Function<Object, Boolean>> validator,
+		Function<Object, Boolean> validator,
 		String description,
 		String descriptionKey,
 		String category,
@@ -380,26 +339,12 @@ public final class Config
 		String defaultValue,
 		Function<Object, Boolean> validator,
 		String description,
-		String descriptionKey,
 		String category,
 		boolean needsWorldRestart,
 		int permissionLvl,
 		boolean clientOnly)
 	{
-		return addString(id, defaultValue, Optional.of(validator), description, descriptionKey, category, needsWorldRestart, permissionLvl, clientOnly);
-	}
-
-	public static boolean addString(
-		Identifier id,
-		String defaultValue,
-		Function<Object, Boolean> validator,
-		String description,
-		String category,
-		boolean needsWorldRestart,
-		int permissionLvl,
-		boolean clientOnly)
-	{
-		return addString(id, defaultValue, Optional.of(validator), description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
+		return addString(id, defaultValue, validator, description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
 	}
 
 	public static boolean addString(
@@ -411,7 +356,7 @@ public final class Config
 		int permissionLvl,
 		boolean clientOnly)
 	{
-		return addString(id, defaultValue, Optional.empty(), description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
+		return addString(id, defaultValue, null, description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
 	}
 
 	public static boolean addString(
@@ -422,15 +367,15 @@ public final class Config
 		int permissionLvl,
 		boolean clientOnly)
 	{
-		return addString(id, defaultValue, Optional.empty(), description, id.getPath(), DEFAULT_CATEGORY, needsWorldRestart, permissionLvl, clientOnly);
+		return addString(id, defaultValue, null, description, id.getPath(), DEFAULT_CATEGORY, needsWorldRestart, permissionLvl, clientOnly);
 	}
 
-	private static boolean addComplex(
+	public static boolean addComplex(
 		Identifier id,
 		Object defaultValue,
-		Optional<Function<Object, Boolean>> validator,
-		Optional<Function<Object, String>> stringifier,
-		Optional<Function<String, Object>> destringifier,
+		Function<Object, Boolean> validator,
+		Function<Object, String> stringifier,
+		Function<String, Object> destringifier,
 		String description,
 		String descriptionKey,
 		String category,
@@ -464,28 +409,12 @@ public final class Config
 		Function<Object, String> stringifier,
 		Function<String, Object> destringifier,
 		String description,
-		String descriptionKey,
 		String category,
 		boolean needsWorldRestart,
 		int permissionLvl,
 		boolean clientOnly)
 	{
-		return addComplex(id, defaultValue, Optional.of(validator), Optional.of(stringifier), Optional.of(destringifier), description, descriptionKey, category, needsWorldRestart, permissionLvl, clientOnly);
-	}
-
-	public static boolean addComplex(
-		Identifier id,
-		Object defaultValue,
-		Function<Object, Boolean> validator,
-		Function<Object, String> stringifier,
-		Function<String, Object> destringifier,
-		String description,
-		String category,
-		boolean needsWorldRestart,
-		int permissionLvl,
-		boolean clientOnly)
-	{
-		return addComplex(id, defaultValue, Optional.of(validator), Optional.of(stringifier), Optional.of(destringifier), description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
+		return addComplex(id, defaultValue, validator, stringifier, destringifier, description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
 	}
 
 	public static boolean addComplex(
@@ -499,7 +428,7 @@ public final class Config
 		int permissionLvl,
 		boolean clientOnly)
 	{
-		return addComplex(id, defaultValue, Optional.empty(), Optional.of(stringifier), Optional.of(destringifier), description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
+		return addComplex(id, defaultValue, null, stringifier, destringifier, description, id.getPath(), category, needsWorldRestart, permissionLvl, clientOnly);
 	}
 
 	public static boolean addComplex(
@@ -512,43 +441,43 @@ public final class Config
 		int permissionLvl,
 		boolean clientOnly)
 	{
-		return addComplex(id, defaultValue, Optional.empty(), Optional.of(stringifier), Optional.of(destringifier), description, id.getPath(), DEFAULT_CATEGORY, needsWorldRestart, permissionLvl, clientOnly);
+		return addComplex(id, defaultValue, null, stringifier, destringifier, description, id.getPath(), DEFAULT_CATEGORY, needsWorldRestart, permissionLvl, clientOnly);
 	}
 
-	public static void loadOrCreateConfigFile(String configName, boolean skipClientOnly)
+	private static void loadOrCreateConfigFile(String modId, boolean skipClientOnly)
 	{
-		File configFile = getConfigPath(configName);
+		File configFile = getConfigPath(modId);
 		if (configFile == null) return;
 
 		Path configFilePath = Paths.get(configFile.toURI());
 
 		if (configFile.exists())
 		{
-			loadConfigFromFile(configFilePath, skipClientOnly);
+			loadConfigFromFile(modId, configFilePath, skipClientOnly);
 		}
 		else
 		{
-			createConfigFile(configFilePath, true, skipClientOnly);
+			createConfigFile(modId, configFilePath, true, skipClientOnly);
 		}
 	}
 
-	public static void save(String configName)
+	public static void save(String modId)
 	{
-		save(configName, false);
+		save(modId, false);
 	}
 
-	public static void save(String configName, boolean skipClientOnly)
+	public static void save(String modId, boolean skipClientOnly)
 	{
-		File configFile = getConfigPath(configName);
+		File configFile = getConfigPath(modId);
 		if (configFile == null) return;
 
 		Path configFilePath = Paths.get(configFile.toURI());
-		createConfigFile(configFilePath, false, skipClientOnly);
+		createConfigFile(modId, configFilePath, false, skipClientOnly);
 	}
 
-	private static File getConfigPath(String configName)
+	private static File getConfigPath(String modId)
 	{
-		if (configName == null || configName.isEmpty()) return null;
+		if (modId == null || modId.isEmpty()) return null;
 
 		File gameDir = new File(System.getProperty("user.dir"));
 		File configDir;
@@ -571,14 +500,17 @@ public final class Config
 			return null;
 		}
 
-		return new File(configDir, configName + ".cfg");
+		return new File(configDir, modId + ".cfg");
 	}
 
-	private static void createConfigFile(Path file, boolean initToDefaults, boolean skipClientOnly)
+	private static void createConfigFile(String modId, Path file, boolean initToDefaults, boolean skipClientOnly)
 	{
 		StringBuilder builder = new StringBuilder();
 		// Sort the entries by the key, this way the ordering in the config file does not change all the time.
-		var sortedEntries = registry.entrySet().stream().sorted(Comparator.comparing(Map.Entry::getKey)).toList();
+		var sortedEntries = registry.entrySet().stream()
+			.filter(entry -> entry.getKey().getNamespace().equals(modId))
+			.sorted(Map.Entry.comparingByKey())
+			.toList();
 
 		for (var entry : sortedEntries)
 		{
@@ -587,7 +519,7 @@ public final class Config
 			if (skipClientOnly && configValue.clientOnly) continue;	// No need to write clientOnly settings into config file on the dedicated server.
 			if (initToDefaults) configValue.setDefaultValue();
 
-			appendConfigValue(entry.getKey(), configValue, builder);
+			appendConfigValue(entry.getKey().getPath(), configValue, builder);
 		}
 
 		try
@@ -600,7 +532,7 @@ public final class Config
 		}
 	}
 
-	private static void appendConfigValue(Identifier id, ConfigSetting setting, StringBuilder builder)
+	private static void appendConfigValue(String name, ConfigSetting setting, StringBuilder builder)
 	{
 		if (setting.isInvalid()) setting.setDefaultValue();
 
@@ -611,7 +543,7 @@ public final class Config
 			builder.append("\n");
 		}
 
-		builder.append(id);
+		builder.append(name);
 		builder.append("=");
 
 		if (setting.isComplex())
@@ -631,7 +563,7 @@ public final class Config
 	// are found when parsing a config file, the config file gets rewritten with the parsed settings and
 	// default values for those that were missing. Because clientOnly settings are not stored in the config
 	// file on dedicated servers, the flag needs to be carried through here!
-	private static void loadConfigFromFile(Path file, boolean skipClientOnlyOnWritingConfigFile)
+	private static void loadConfigFromFile(String modId, Path file, boolean skipClientOnlyOnWritingConfigFile)
 	{
 		List<String> lines;
 
@@ -645,9 +577,6 @@ public final class Config
 			return;
 		}
 
-		String[] components;
-		Identifier settingId;
-		String settingValue;
 		int parsedSettingsCount = 0;
 		boolean parseError = false;
 
@@ -656,11 +585,23 @@ public final class Config
 			line = line.trim();
 			if (line.startsWith("#")) continue;	// Skip comments.
 
-			components = line.split("=");
-			if (components.length != 2) continue;
+			String[] components = line.split("=");
+			if (components.length != 2)
+			{
+				parseError = true;
+				continue;
+			}
 
-			settingId = Identifier.parse(components[0]);
-			settingValue = components[1];
+			String settingIdPath = components[0].trim();
+			String settingValue = components[1].trim();
+
+			if (settingIdPath.isEmpty() || !Identifier.isValidPath(settingIdPath) || settingValue.isEmpty())
+			{
+				parseError = true;
+				continue;
+			}
+
+			Identifier settingId = Identifier.fromNamespaceAndPath(modId, settingIdPath);
 
 			if (registry.containsKey(settingId))
 			{
@@ -697,7 +638,7 @@ public final class Config
 
 		// Rewrite the config file if there were settings missing during loading.
 		// One possible reason for this happening is an old config file.
-		if (parseError || parsedSettingsCount != registry.size()) createConfigFile(file, false, skipClientOnlyOnWritingConfigFile);
+		if (parseError || parsedSettingsCount != registry.size()) createConfigFile(modId, file, false, skipClientOnlyOnWritingConfigFile);
 	}
 
 	/**
@@ -705,13 +646,15 @@ public final class Config
 	 * Writes the values of all non client-only settings, the player has the appropriate permission lvl for, into the passed in list.
 	 * This is used for changing settings on a server remotely.
 	 */
-	public static void writeServerSettings(boolean toRemoteServer, List<ConfigValue> configValues, Player player)
+	public static void writeServerSettings(String modId, boolean toRemoteServer, List<ConfigValue> configValues, Player player)
 	{
 		var activeRegistry = (toRemoteServer) ? serverRegistry : registry;
 
 		for (var registryEntry : activeRegistry.entrySet())
 		{
 			var id = registryEntry.getKey();
+			if (!id.getNamespace().equals(modId)) continue;
+
 			var configSetting = registryEntry.getValue();
 
 			var requiredPermissionLevel = PermissionLevel.byId(configSetting.permissionLvl);
@@ -726,7 +669,7 @@ public final class Config
 
 	/**
 	 * Reads the values of all non client-only settings, the player has the appropriate permission lvl for, from the passed in list.
-	 * It is assumed that the buffer was filled by calling {@link Config#writeServerSettings(boolean, List, Player)} and that the players
+	 * It is assumed that the buffer was filled by calling {@link Config#writeServerSettings(String, boolean, List, Player)} and that the players
 	 * permissions did not change between both calls. Those settings are stored in a separate server-only registry.
 	 * This is used for changing settings on a server remotely.
 	 */
@@ -755,12 +698,20 @@ public final class Config
 		}
 	}
 
-	public static void reset()
+	private static void reset(String modId)
 	{
-		registry.clear();
+		modInfos.remove(modId);
+
+		registry.entrySet().stream()
+			.filter(entry -> entry.getKey().getNamespace().equals(modId))
+			.toList()
+			.forEach(entry -> {
+				registry.remove(entry.getKey());
+				serverRegistry.remove(entry.getKey());
+			});
 	}
 
-	public static final StreamCodec<FriendlyByteBuf, List<ConfigValue>> LIST_STREAM_CODEC = new StreamCodec<FriendlyByteBuf, List<ConfigValue>>()
+	public static final StreamCodec<FriendlyByteBuf, List<ConfigValue>> LIST_STREAM_CODEC = new StreamCodec<>()
 	{
 		@Override
 		public List<ConfigValue> decode(FriendlyByteBuf input)
@@ -777,7 +728,7 @@ public final class Config
 
 	public record ConfigValue(Identifier id, Object value)
 	{
-		public static final StreamCodec<FriendlyByteBuf, ConfigValue> STREAM_CODEC = new StreamCodec<FriendlyByteBuf, ConfigValue>()
+		public static final StreamCodec<FriendlyByteBuf, ConfigValue> STREAM_CODEC = new StreamCodec<>()
 		{
 			@Override
 			public ConfigValue decode(FriendlyByteBuf input)
@@ -785,14 +736,23 @@ public final class Config
 				var id = input.readIdentifier();
 				var setting = registry.get(id);
 
-				Object value = switch (setting.valueType)
+				Object value = null;
+
+				if (setting != null)
 				{
-					case Int ->  input.readInt();
-					case Float -> input.readFloat();
-					case Boolean -> input.readBoolean();
-					case String -> input.readUtf();
-					case Complex -> setting.destringify(input.readUtf());
-				};
+					value = switch (setting.valueType)
+					{
+						case Int -> input.readInt();
+						case Float -> input.readFloat();
+						case Boolean -> input.readBoolean();
+						case String -> input.readUtf();
+						case Complex -> setting.destringify(input.readUtf());
+					};
+				}
+				else
+				{
+					LOG.error("Failed decoding ConfigValue (id: {}). Setting for the provided id could not be found.", id);
+				}
 
 				return new ConfigValue(id, value);
 			}
@@ -803,26 +763,34 @@ public final class Config
 				output.writeIdentifier(configValue.id);
 				var setting = registry.get(configValue.id);
 
-				switch (setting.valueType)
+				if (setting != null)
 				{
-					case Int -> output.writeInt((int)configValue.value);
-					case Float -> output.writeFloat((float)configValue.value);
-					case Boolean -> output.writeBoolean((boolean)configValue.value);
-					case String -> output.writeUtf((String)configValue.value);
-					case Complex -> output.writeUtf(setting.stringifier.get().apply(configValue.value));
+					switch (setting.valueType)
+					{
+						case Int -> output.writeInt((int) configValue.value);
+						case Float -> output.writeFloat((float) configValue.value);
+						case Boolean -> output.writeBoolean((boolean) configValue.value);
+						case String -> output.writeUtf((String) configValue.value);
+						case Complex -> output.writeUtf(setting.stringifier.apply(configValue.value));
+					}
+				}
+				else
+				{
+					LOG.error("Failed encoding ConfigValue (id: {}). Setting for the provided id could not be found.", configValue.id);
 				}
 			}
 		};
 	}
 
-	public record ConfigCommandPayload(List<ConfigValue> values, boolean fromDedicatedServer) implements CustomPacketPayload
+	public record ConfigCommandPayload(String modId, List<ConfigValue> values, boolean fromDedicatedServer) implements CustomPacketPayload
 	{
 		public static final Identifier ID = Identifier.fromNamespaceAndPath(SimpleModsLib.MOD_ID,"config_command");
 		public static final Type<ConfigCommandPayload> TYPE = new Type<>(ID);
 		public static final StreamCodec<FriendlyByteBuf, ConfigCommandPayload> STREAM_CODEC = StreamCodec.composite(
+			ByteBufCodecs.STRING_UTF8, ConfigCommandPayload::modId,
 			LIST_STREAM_CODEC, ConfigCommandPayload::values,
-				ByteBufCodecs.BOOL, ConfigCommandPayload::fromDedicatedServer,
-				ConfigCommandPayload::new
+			ByteBufCodecs.BOOL, ConfigCommandPayload::fromDedicatedServer,
+			ConfigCommandPayload::new
 		);
 
 		public @NonNull Type<? extends CustomPacketPayload> type()
@@ -830,6 +798,8 @@ public final class Config
 			return TYPE;
 		}
 	}
+
+	public record ModInfo(String configGuiTitle, boolean onDedicatedServer) {}
 
 	@FunctionalInterface
 	public interface AddSettingsCallback
@@ -870,11 +840,9 @@ public final class Config
 	 */
 	public static void initialize(String modId, String configGuiTitle, boolean onDedicatedServer, AddSettingsCallback initCallback)
 	{
-		Config.modId = modId;
-		Config.configGuiTitle = configGuiTitle;
-		Config.onDedicatedServer = onDedicatedServer;
+		reset(modId);
 
-		reset();
+		modInfos.put(modId, new ModInfo(configGuiTitle, onDedicatedServer));
 		initCallback.addSettings();
 		loadOrCreateConfigFile(modId, onDedicatedServer);
 	}
@@ -886,6 +854,9 @@ public final class Config
 	 */
 	public static void registerServerSideNetworking()
 	{
+		if (isServerSideNetworkingRegistered) return;
+		isServerSideNetworkingRegistered = true;
+
 		PayloadTypeRegistry.serverboundPlay().register(Config.ConfigCommandPayload.TYPE, Config.ConfigCommandPayload.STREAM_CODEC);
 		PayloadTypeRegistry.clientboundPlay().register(Config.ConfigCommandPayload.TYPE, Config.ConfigCommandPayload.STREAM_CODEC);
 
@@ -894,7 +865,7 @@ public final class Config
 		ServerPlayNetworking.registerGlobalReceiver(Config.ConfigCommandPayload.TYPE, (payload, ctx) -> {
 			var player = ctx.player();
 			Config.readServerSettings(false, payload.values(), player);
-			Config.save(modId, true);
+			Config.save(payload.modId(), true);
 		});
 	}
 
@@ -906,27 +877,44 @@ public final class Config
 	@Environment(EnvType.CLIENT)
 	public static void registerClientSideNetworking()
 	{
+		if (isClientSideNetworkingRegistered) return;
+		isClientSideNetworkingRegistered = true;
+
 		ConfigClientInit.registerClientSideNetworking();
 	}
 
 	/**
 	 * <b>(Optional)</b><br>
-	 * Register a command to show the config gui (/smods config).<br>
-	 * {@link Config#executeCommand(CommandContext)} may be used instead in a custom command structure.<br>
-	 * Use {@code commands.smods.info} localization key to customize the info text the /smods command shows the client.
+	 * Register a command to show the config gui (/modId config).<br>
+	 * {@link Config#executeCommand(CommandContext, String)} may be used instead in a custom command structure.<br>
+	 * Use {@code commands.modId.info} localization key to customize the info text the /modId command shows the client.
 	 *
 	 */
-	public static void registerCommand(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext buildContext, Commands.CommandSelection selection)
+	public static void registerCommand(CommandDispatcher<CommandSourceStack> dispatcher, String modId)
 	{
+		if (modId == null)
+		{
+			LOG.error("Command registration failed. modId was null.");
+			return;
+		}
+
+		if (modId.trim().isEmpty())
+		{
+			LOG.error("Command registration failed. modId was empty.");
+			return;
+		}
+
+		final String commandDescriptionKey = "commands." + modId + ".info";
+
 		dispatcher.register(
-			Commands.literal("smods")
+			Commands.literal(modId)
 				.executes(context -> {
-					context.getSource().sendSuccess(() -> Component.translatable("commands.smods.info"), false);
+					context.getSource().sendSuccess(() -> Component.translatable(commandDescriptionKey), false);
 					return 1;
 				})
 				.then(
 					Commands.literal("config")
-						.executes(Config::executeCommand)
+						.executes(context -> executeCommand(context, modId))
 				)
 		);
 	}
@@ -934,7 +922,7 @@ public final class Config
 	/**
 	 * <b>(Optional)</b><br>
 	 * Executes the command to show the config gui.<br>
-	 * Can be used instead of {@link Config#registerCommand(CommandDispatcher, CommandBuildContext, Commands.CommandSelection)} to integrate the command in
+	 * Can be used instead of {@link Config#registerCommand(CommandDispatcher, String)} to integrate the command in
 	 * an existing command structure.
 	 * <br><br>
 	 * Example:
@@ -952,14 +940,16 @@ public final class Config
 	 * @return
 	 * {@code 1} on success, {@code 0} on failure.
 	 */
-	public static int executeCommand(CommandContext<CommandSourceStack> context)
+	public static int executeCommand(CommandContext<CommandSourceStack> context, String modId)
 	{
 		var player =  context.getSource().getPlayer();
 		if (player == null) return 0;
 
+		ModInfo modInfo = modInfos.get(modId);
+
 		List<Config.ConfigValue> configValues = new ArrayList<>();
-		Config.writeServerSettings(false, configValues, player);
-		Config.ConfigCommandPayload outgoingPayload = new Config.ConfigCommandPayload(configValues, onDedicatedServer);
+		writeServerSettings(modId,false, configValues, player);
+		ConfigCommandPayload outgoingPayload = new ConfigCommandPayload(modId, configValues, modInfo.onDedicatedServer());
 
 		ServerPlayNetworking.send(player, outgoingPayload);
 
