@@ -30,7 +30,7 @@ public abstract class FluidContainerItemBase extends Item implements IFluidConta
 	protected FluidContainerItemBase(Properties properties, int defaultCapacity)
 	{
 		super(properties
-			.component(SimpleModsLib.FLUID_CONTAINER_COMPONENT, new FluidContainerComponent(0, 16000, FluidStack.empty().getRegistryKey(), false))
+			.component(SimpleModsLib.FLUID_CONTAINER_COMPONENT, new FluidContainerComponent(0, defaultCapacity, FluidStack.empty().getRegistryKey(), false))
 			.component(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(List.of(1.0f), Collections.emptyList(), Collections.emptyList(), List.of(0)))
 		);
 	}
