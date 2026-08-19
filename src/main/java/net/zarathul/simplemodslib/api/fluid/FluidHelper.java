@@ -9,6 +9,7 @@ import net.minecraft.client.renderer.block.FluidModel;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.resources.Identifier;
@@ -22,6 +23,8 @@ import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.alchemy.PotionContents;
+import net.minecraft.world.item.alchemy.Potions;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -61,9 +64,17 @@ public final class FluidHelper
 		{
 			result = fillEmptyBucket(player, hand, handler);
 		}
-		else if (isBucket(heldItem))
+		else if (isFilledBucket(heldItem))
 		{
 			result = drainBucket(player, hand, handler);
+		}
+		else if (heldItem == Items.GLASS_BOTTLE)
+		{
+			result = fillEmptyGlassBottle(player, hand, handler);
+		}
+		else if (heldItem == Items.POTION)
+		{
+			result = drainWaterBottle(player, hand, handler);
 		}
 		else if (isFluidContainerItem(heldItem))
 		{
@@ -257,10 +268,13 @@ public final class FluidHelper
 		// the empty bucket in the players hand with a filled one of the correct type.
 		if ((handlerFluid.getAmount() >= FluidStack.BUCKET_VOLUME))
 		{
-			if (!handler.drain(new FluidStack(handlerFluid.getFluid(), FluidStack.BUCKET_VOLUME)).isEmpty() && !player.isCreative())
+			if (!handler.drain(new FluidStack(handlerFluid.getFluid(), FluidStack.BUCKET_VOLUME)).isEmpty())
 			{
-				Item bucket = getBucketForFluid(handlerFluid.getFluid());
-				player.setItemInHand(hand, new ItemStack(bucket));
+				if (!player.isCreative())
+				{
+					Item bucket = getBucketForFluid(handlerFluid.getFluid());
+					player.setItemInHand(hand, new ItemStack(bucket));
+				}
 
 				return FluidHandlerInteractionResult.success(FluidHandlerInteraction.FILL, new FluidStack(handlerFluid.getFluid(), FluidStack.BUCKET_VOLUME));
 			}
@@ -284,6 +298,69 @@ public final class FluidHelper
 			if (handler.fill(fillFluid) > 0)
 			{
 				if (!player.isCreative()) player.setItemInHand(hand, new ItemStack(Items.BUCKET));
+
+				return FluidHandlerInteractionResult.success(FluidHandlerInteraction.DRAIN, fillFluid);
+			}
+		}
+
+		return FluidHandlerInteractionResult.failure();
+	}
+
+	private static FluidHandlerInteractionResult fillEmptyGlassBottle(ServerPlayer player, InteractionHand hand, IFluidHandler handler)
+	{
+		FluidStack handlerFluid = handler.getFluid();
+
+		// If the fluid handler has one bucket worth of water, drain it and replace
+		// the empty glass bottle in the players hand with a filled one.
+		if (handlerFluid.getFluid().isSame(Fluids.WATER) && (handlerFluid.getAmount() >= FluidStack.BUCKET_VOLUME))
+		{
+			if (!handler.drain(new FluidStack(Fluids.WATER, FluidStack.BUCKET_VOLUME)).isEmpty())
+			{
+				if (!player.isCreative())
+				{
+					// Glass bottle filled with water is a potion.
+					ItemStack heldItem = player.getItemInHand(hand);
+					ItemStack waterBottle = PotionContents.createItemStack(Items.POTION, Potions.WATER);
+
+					if (!player.getInventory().add(waterBottle))
+					{
+						player.drop(waterBottle, false);
+					}
+
+					// For some reason the water bottle turns back into an empty glass bottle most of the time, if the held item is consumed before adding the new one.
+					heldItem.consume(1, player);
+				}
+
+				return FluidHandlerInteractionResult.success(FluidHandlerInteraction.FILL, new FluidStack(handlerFluid.getFluid(), FluidStack.BUCKET_VOLUME));
+			}
+		}
+
+		return FluidHandlerInteractionResult.failure();
+	}
+
+	private static FluidHandlerInteractionResult drainWaterBottle(ServerPlayer player, InteractionHand hand, IFluidHandler handler)
+	{
+		PotionContents potionContents = player.getItemInHand(hand).getOrDefault(DataComponents.POTION_CONTENTS, PotionContents.EMPTY);
+		FluidStack handlerFluid = handler.getFluid();
+
+		// Try to fill one bucket worth of fluid into the handler, if there is enough room. The type of
+		// fluid is always water, since the only real fluid bottles can contain is water. If successful,
+		// replace the water potion in the players hand with an empty one.
+		if ((handler.getCapacity() - handlerFluid.getAmount()) >= FluidStack.BUCKET_VOLUME)
+		{
+			FluidStack fillFluid = new FluidStack(Fluids.WATER, FluidStack.BUCKET_VOLUME);
+
+			if (handler.fill(fillFluid) > 0)
+			{
+				if (!player.isCreative())
+				{
+					player.getItemInHand(hand).consume(1, player);
+					ItemStack emptyBottle = new ItemStack(Items.GLASS_BOTTLE);
+					if (!player.getInventory().add(emptyBottle))
+					{
+						player.drop(emptyBottle, false);
+					}
+				}
 
 				return FluidHandlerInteractionResult.success(FluidHandlerInteraction.DRAIN, fillFluid);
 			}
@@ -332,14 +409,18 @@ public final class FluidHelper
 
 	private static Item getBucketForFluid(Fluid fluid)
 	{
+		if (fluid.isSame(Fluids.EMPTY)) return Items.BUCKET;
+
 		// TODO: Find a better way to do this
 		if (FLUID_TO_BUCKET.isEmpty()) BuiltInRegistries.FLUID.forEach(x -> FLUID_TO_BUCKET.put(x, x.getBucket()));
 
 		return FLUID_TO_BUCKET.get(fluid);
 	}
 
-	private static boolean isBucket(Item item)
+	private static boolean isFilledBucket(Item item)
 	{
+		if (item == Items.AIR) return false;
+
 		// TODO: Find a better way to do this
 		if (FLUID_TO_BUCKET.isEmpty()) BuiltInRegistries.FLUID.forEach(x -> FLUID_TO_BUCKET.put(x, x.getBucket()));
 

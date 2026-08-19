@@ -4,7 +4,8 @@
 	"package": "net.zarathul.simplemodslib.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
-		"OverworldBiomesAccessor"
+		"OverworldBiomesAccessor",
+		"ItemAccessor"
 	],
 	"client": [
 		"SpriteContentsAccessor"
