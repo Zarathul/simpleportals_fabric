@@ -48,6 +48,21 @@ public final class Utils
 	}
 
 	/**
+	 * Gets the localized formatted literal {@link Component} for the specified key.
+	 *
+	 * @param key
+	 * The key for the localized string.
+	 * @param args
+	 * Formatting arguments.
+	 * @return
+	 * The localized formatted {@link Component}.
+	 */
+	public static Component getTranslatedComponent(String key, Object... args)
+	{
+		return Component.literal(translate(key, args));
+	}
+
+	/**
 	 * Gets the localized formatted components for the specified key and formatting arguments.
 	 *
 	 * @param key
