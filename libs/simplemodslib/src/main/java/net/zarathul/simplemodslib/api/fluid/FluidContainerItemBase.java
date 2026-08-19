@@ -91,7 +91,7 @@ public abstract class FluidContainerItemBase extends Item implements IFluidConta
 	{
 		Level level = context.getLevel();
 
-		if (!level.isClientSide()) // Try to pick up source block.
+		if (!level.isClientSide())
 		{
 			BlockPos clickedPos = context.getClickedPos();
 			// Fluids are click-through, so look at the block in direction of the clicked face.
@@ -99,6 +99,7 @@ public abstract class FluidContainerItemBase extends Item implements IFluidConta
 			FluidState fluidStateAtClickedPos = level.getFluidState(targetPos);
 			ItemStack heldItemStack = context.getItemInHand();
 
+			// Try to pick up source block.
 			if (!fluidStateAtClickedPos.isEmpty() && fluidStateAtClickedPos.isSource())
 			{
 				FluidStack sourceFluid = new FluidStack(fluidStateAtClickedPos.getType(), FluidStack.BUCKET_VOLUME);
@@ -157,7 +158,7 @@ public abstract class FluidContainerItemBase extends Item implements IFluidConta
 			}
 		}
 
-		return super.useOn(context);
+		return InteractionResult.SUCCESS;
 	}
 
 	@Override

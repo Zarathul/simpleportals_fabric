@@ -2,19 +2,6 @@ plugins {
 	id 'net.fabricmc.fabric-loom' version "${loom_version}"
 }
 
-version = project.mod_version
-
-loom {
-	//splitEnvironmentSourceSets()
-
-	mods {
-		"simpleportals" {
-			sourceSet sourceSets.main
-//			sourceSet sourceSets.client
-		}
-	}
-}
-
 dependencies {
 	//to change the versions see the gradle.properties file
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
