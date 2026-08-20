@@ -2,14 +2,14 @@ package net.zarathul.simplemodslib.api.fluid;
 
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
-import net.zarathul.simplemodslib.SimpleModsLib;
+import net.zarathul.simplemodslib.ModComponents;
 
 public interface IFluidContainerItem
 {
 	default
 	FluidStack drain(ItemStack itemStack, FluidStack drainFluidStack)
 	{
-		FluidContainerComponent dataComponent = itemStack.get(SimpleModsLib.FLUID_CONTAINER_COMPONENT);
+		FluidContainerComponent dataComponent = itemStack.get(ModComponents.FLUID_CONTAINER_COMPONENT);
 		if (dataComponent == null) return FluidStack.empty();
 
 		FluidStack itemFluidStack = FluidStack.from(dataComponent);
@@ -21,7 +21,7 @@ public interface IFluidContainerItem
 		drainedFluid.setAmount(Math.min(itemFluidStack.getAmount(), drainAmount));
 		itemFluidStack.changeAmount(-drainedFluid.getAmount());
 
-		itemStack.set(SimpleModsLib.FLUID_CONTAINER_COMPONENT, new FluidContainerComponent(itemFluidStack.getAmount(), dataComponent.capacity(), itemFluidStack.getRegistryKey(), dataComponent.singleBucketMode()));
+		itemStack.set(ModComponents.FLUID_CONTAINER_COMPONENT, new FluidContainerComponent(itemFluidStack.getAmount(), dataComponent.capacity(), itemFluidStack.getRegistryKey(), dataComponent.singleBucketMode()));
 		onFluidChanged(itemStack, itemFluidStack.getAmount(), dataComponent.capacity(), itemFluidStack.getRegistryKey());
 
 		return drainedFluid;
@@ -30,7 +30,7 @@ public interface IFluidContainerItem
 	default
 	int fill(ItemStack itemStack, FluidStack fillFluidStack)
 	{
-		FluidContainerComponent dataComponent = itemStack.get(SimpleModsLib.FLUID_CONTAINER_COMPONENT);
+		FluidContainerComponent dataComponent = itemStack.get(ModComponents.FLUID_CONTAINER_COMPONENT);
 
 		if (fillFluidStack.isEmpty() || dataComponent == null) return 0;
 
@@ -43,7 +43,7 @@ public interface IFluidContainerItem
 			itemFluidStack = fillFluidStack.copy();
 			// limit the stored fluid to the tanks capacity
 			if (!itemFluidStack.isEmpty()) itemFluidStack.setAmount(Math.min(itemFluidStack.getAmount(), itemCapacity));
-			itemStack.set(SimpleModsLib.FLUID_CONTAINER_COMPONENT, new FluidContainerComponent(itemFluidStack.getAmount(), dataComponent.capacity(), itemFluidStack.getRegistryKey(), dataComponent.singleBucketMode()));
+			itemStack.set(ModComponents.FLUID_CONTAINER_COMPONENT, new FluidContainerComponent(itemFluidStack.getAmount(), dataComponent.capacity(), itemFluidStack.getRegistryKey(), dataComponent.singleBucketMode()));
 			onFluidChanged(itemStack, itemFluidStack.getAmount(), dataComponent.capacity(), itemFluidStack.getRegistryKey());
 
 			return itemFluidStack.getAmount();
@@ -58,7 +58,7 @@ public interface IFluidContainerItem
 		if (fillAmount > 0)
 		{
 			itemFluidStack.changeAmount(fillAmount);
-			itemStack.set(SimpleModsLib.FLUID_CONTAINER_COMPONENT, new FluidContainerComponent(itemFluidStack.getAmount(), dataComponent.capacity(), itemFluidStack.getRegistryKey(), dataComponent.singleBucketMode()));
+			itemStack.set(ModComponents.FLUID_CONTAINER_COMPONENT, new FluidContainerComponent(itemFluidStack.getAmount(), dataComponent.capacity(), itemFluidStack.getRegistryKey(), dataComponent.singleBucketMode()));
 			onFluidChanged(itemStack, itemFluidStack.getAmount(), dataComponent.capacity(), itemFluidStack.getRegistryKey());
 		}
 

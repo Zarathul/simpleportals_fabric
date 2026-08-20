@@ -7,7 +7,7 @@ import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
-import net.zarathul.simplemodslib.SimpleModsLib;
+import net.zarathul.simplemodslib.ModComponents;
 
 import java.util.Objects;
 
@@ -144,7 +144,7 @@ public class FluidStack
 
 	public static FluidStack getFluid(ItemStack stack)
 	{
-		var component = stack.get(SimpleModsLib.FLUID_CONTAINER_COMPONENT);
+		var component = stack.get(ModComponents.FLUID_CONTAINER_COMPONENT);
 		if (component == null) return FluidStack.empty();
 
 		FluidStack fluidStack = FluidStack.from(component);

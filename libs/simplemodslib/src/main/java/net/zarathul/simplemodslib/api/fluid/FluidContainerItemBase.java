@@ -20,7 +20,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
-import net.zarathul.simplemodslib.SimpleModsLib;
+import net.zarathul.simplemodslib.ModComponents;
 
 import java.util.Collections;
 import java.util.List;
@@ -30,7 +30,7 @@ public abstract class FluidContainerItemBase extends Item implements IFluidConta
 	protected FluidContainerItemBase(Properties properties, int defaultCapacity)
 	{
 		super(properties
-			.component(SimpleModsLib.FLUID_CONTAINER_COMPONENT, new FluidContainerComponent(0, defaultCapacity, FluidStack.empty().getRegistryKey(), false))
+			.component(ModComponents.FLUID_CONTAINER_COMPONENT, new FluidContainerComponent(0, defaultCapacity, FluidStack.empty().getRegistryKey(), false))
 			.component(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(List.of(1.0f), Collections.emptyList(), Collections.emptyList(), List.of(0)))
 		);
 	}
@@ -44,7 +44,7 @@ public abstract class FluidContainerItemBase extends Item implements IFluidConta
 	@Override
 	public int getBarWidth(ItemStack stack)
 	{
-		FluidContainerComponent componentData = stack.get(SimpleModsLib.FLUID_CONTAINER_COMPONENT);
+		FluidContainerComponent componentData = stack.get(ModComponents.FLUID_CONTAINER_COMPONENT);
 		if (componentData != null)
 		{
 			int fillLevel = Mth.clamp(Math.round((componentData.amount() / (float)componentData.capacity()) * 13.0f), 0, 13);
@@ -56,7 +56,7 @@ public abstract class FluidContainerItemBase extends Item implements IFluidConta
 	@Override
 	public int getBarColor(ItemStack stack)
 	{
-		FluidContainerComponent componentData = stack.get(SimpleModsLib.FLUID_CONTAINER_COMPONENT);
+		FluidContainerComponent componentData = stack.get(ModComponents.FLUID_CONTAINER_COMPONENT);
 		if (componentData != null)
 		{
 			int capacity = componentData.capacity();
@@ -72,12 +72,12 @@ public abstract class FluidContainerItemBase extends Item implements IFluidConta
 		if (!level.isClientSide() && !player.isCrouching())
 		{
 			ItemStack itemStack = player.getItemInHand(hand);
-			FluidContainerComponent component = itemStack.get(SimpleModsLib.FLUID_CONTAINER_COMPONENT);
+			FluidContainerComponent component = itemStack.get(ModComponents.FLUID_CONTAINER_COMPONENT);
 			if (component != null)
 			{
 				// Cycle the fill mode between max, always drain/fill the maximum amount, and bucket, drain/fill one bucket at a time.
 				boolean newMode = !component.singleBucketMode();
-				itemStack.set(SimpleModsLib.FLUID_CONTAINER_COMPONENT, new FluidContainerComponent(component.amount(), component.capacity(), component.fluidId(), newMode));
+				itemStack.set(ModComponents.FLUID_CONTAINER_COMPONENT, new FluidContainerComponent(component.amount(), component.capacity(), component.fluidId(), newMode));
 
 				return InteractionResult.SUCCESS_SERVER;
 			}
