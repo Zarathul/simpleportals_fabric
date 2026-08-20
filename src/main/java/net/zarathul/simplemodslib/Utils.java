@@ -291,7 +291,7 @@ public final class Utils
 	/**
 	 * Cache for {@code isInterfaceAvailable()} return values.
 	 */
-	private static HashMap<String, Boolean> InterfaceLookupCache = new HashMap<>();
+	private static final HashMap<String, Boolean> InterfaceLookupCache = new HashMap<>();
 
 	/**
 	 * Checks if the given interface is available. This is used to call into APIs of other mods that may not always be
