@@ -19,9 +19,12 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
+import net.zarathul.simplemodslib.Utils;
 import net.zarathul.simplemodslib.api.gui.CycleButtonEx;
 import net.zarathul.simpleportals.SimplePortals;
-import net.zarathul.simplemodslib.Utils;
+import net.zarathul.simpleportals.network.payloads.DeactivatePortalPayload;
+import net.zarathul.simpleportals.network.payloads.SetPortalPowerPayload;
+import net.zarathul.simpleportals.network.payloads.TpdCommandPayload;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -387,22 +390,22 @@ public class PortalListScreen extends Screen
 				powerBox.setValue(Integer.toString(portal.power()));
 				powerBox.moveCursorToStart(false);
 
-				setPowerButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(SimplePortals.id("set_power_button"), SimplePortals.id("set_power_button_highlighted")), button -> {
+				setPowerButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(SimplePortals.modId("set_power_button"), SimplePortals.modId("set_power_button_highlighted")), button -> {
 					try
 					{
 						int power = Integer.parseInt(powerBox.getValue());
-						ClientPlayNetworking.send(new SimplePortals.SetPortalPowerPayload(portal.dimension().identifier(), portal.location(), power, new PortalListSettings(sorting, filter)));
+						ClientPlayNetworking.send(new SetPortalPowerPayload(portal.dimension().identifier(), portal.location(), power, new PortalListSettings(sorting, filter)));
 					}
 					catch (NumberFormatException _) {}
 				});
 
-				gotoLocationButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(SimplePortals.id("teleport"), SimplePortals.id("teleport_highlighted")), button -> {
+				gotoLocationButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(SimplePortals.modId("teleport"), SimplePortals.modId("teleport_highlighted")), button -> {
 					minecraft.gui.setScreen(null);
-					ClientPlayNetworking.send(new SimplePortals.TpdCommandPayload(portal.dimension().identifier(), portal.location()));
+					ClientPlayNetworking.send(new TpdCommandPayload(portal.dimension().identifier(), portal.location()));
 				});
 
-				deactivateButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(SimplePortals.id("deactivate_button"), SimplePortals.id("deactivate_button_highlighted")), button -> {
-					ClientPlayNetworking.send(new SimplePortals.DeactivatePortalPayload(portal.dimension().identifier(), portal.location(), new PortalListSettings(sorting, filter)));
+				deactivateButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(SimplePortals.modId("deactivate_button"), SimplePortals.modId("deactivate_button_highlighted")), button -> {
+					ClientPlayNetworking.send(new DeactivatePortalPayload(portal.dimension().identifier(), portal.location(), new PortalListSettings(sorting, filter)));
 				});
 
 				tooltipText = null;

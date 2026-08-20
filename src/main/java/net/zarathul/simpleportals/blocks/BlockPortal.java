@@ -55,15 +55,14 @@ public class BlockPortal extends Block implements net.minecraft.world.level.bloc
 		Axis.class,
 		Axis.X, Axis.Y, Axis.Z);
 
-	public BlockPortal(ResourceKey<Block> id)
+	public BlockPortal(Properties properties)
 	{
-		super(Properties.of()
-			.setId(id)
+		super(properties
 			.noLootTable()
 			.noCollision()
 			.strength(-1.0F) // indestructible by normal means
 			.pushReaction(PushReaction.BLOCK)
-			.lightLevel((state) -> 11)
+			.lightLevel((_) -> 11)
 			.sound(SoundType.GLASS));
 	}
 
@@ -78,14 +77,12 @@ public class BlockPortal extends Block implements net.minecraft.world.level.bloc
 	{
 		Axis portalAxis = state.getValue(AXIS);
 
-		switch (portalAxis)
+		return switch (portalAxis)
 		{
-			case Y: return Y_AABB;
-			case Z: return Z_AABB;
-			case X:
-			default:
-				return X_AABB;
-		}
+			case Y -> Y_AABB;
+			case Z -> Z_AABB;
+			default -> X_AABB;
+		};
 	}
 
 	@Override
@@ -103,7 +100,7 @@ public class BlockPortal extends Block implements net.minecraft.world.level.bloc
 			// Deactivate damaged portals.
 
 			ServerLevel serverLevel = (ServerLevel)level;
-			List<Portal> affectedPortals = SimplePortals.portalRegistry.getPortalsAt(pos, serverLevel.dimension());
+			List<Portal> affectedPortals = SimplePortals.PORTAL_REGISTRY.getPortalsAt(pos, serverLevel.dimension());
 			
 			if (affectedPortals.isEmpty()) return;
 			
@@ -111,7 +108,7 @@ public class BlockPortal extends Block implements net.minecraft.world.level.bloc
 
 			if (firstPortal.isDamaged(serverLevel))
 			{
-				SimplePortals.portalRegistry.deactivatePortal(serverLevel, pos);
+				SimplePortals.PORTAL_REGISTRY.deactivatePortal(serverLevel, pos);
 			}
 		}
 
@@ -177,7 +174,7 @@ public class BlockPortal extends Block implements net.minecraft.world.level.bloc
 	@Override
 	public @Nullable TeleportTransition getPortalDestination(ServerLevel currentLevel, Entity entity, BlockPos portalEntryPos)
 	{
-		PortalRegistry registry = SimplePortals.portalRegistry;
+		PortalRegistry registry = SimplePortals.PORTAL_REGISTRY;
 		Portal startPortal = registry.getPortalsAt(portalEntryPos, currentLevel.dimension()).getFirst();
 
 		List<Portal> potentialDestinationPortals = registry.getPortalsWithAddress(startPortal.address()).stream()
@@ -191,7 +188,7 @@ public class BlockPortal extends Block implements net.minecraft.world.level.bloc
 		Collections.shuffle(potentialDestinationPortals);
 
 		ServerLevel destinationWorld = null;
-		ResourceKey<Level> dimension = null;
+		ResourceKey<Level> dimension;
 		PortalRegistry.TeleportationDestination destination = null;
 		MinecraftServer server = currentLevel.getServer();
 
@@ -210,7 +207,7 @@ public class BlockPortal extends Block implements net.minecraft.world.level.bloc
 		// Bypass the power cost for players in creative mode
 		boolean bypassPowerCost = (entity instanceof ServerPlayer && ((ServerPlayer)entity).isCreative());
 
-		if (destination != null && (bypassPowerCost || Settings.powerCost() == 0 || SimplePortals.portalRegistry.removePower(startPortal, Settings.powerCost())))
+		if (destination != null && (bypassPowerCost || Settings.powerCost() == 0 || SimplePortals.PORTAL_REGISTRY.removePower(startPortal, Settings.powerCost())))
 		{
 			TeleportTransition.PostTeleportTransition postTransition = TeleportTransition.PLACE_PORTAL_TICKET;
 			if (Settings.teleportationSoundEnabled()) postTransition = postTransition.then(TeleportTransition.PLAY_PORTAL_SOUND);
@@ -238,14 +235,14 @@ public class BlockPortal extends Block implements net.minecraft.world.level.bloc
 		{
 			if (Settings.powerSourceTag() == null)
 			{
-				SimplePortals.log.error("Misconfigured portal power source. The item tag '{}' could not be found.", Settings.powerSource());
+				SimplePortals.LOG.error("Misconfigured portal power source. The item tag '{}' could not be found.", Settings.powerSource());
 				return false;
 			}
 
 			ItemStack itemStack = ((ItemEntity)entity).getItem();
 			if (!itemStack.is(Settings.powerSourceTag())) return false;
 
-			List<Portal> portals = SimplePortals.portalRegistry.getPortalsAt(pos, world.dimension());
+			List<Portal> portals = SimplePortals.PORTAL_REGISTRY.getPortalsAt(pos, world.dimension());
 			if (portals.isEmpty()) return false;
 
 			MinecraftServer server = world.getServer();
@@ -253,11 +250,11 @@ public class BlockPortal extends Block implements net.minecraft.world.level.bloc
 
 			Portal portal = portals.getFirst();
 
-			if ((SimplePortals.portalRegistry.getPortalPower(portal) < Settings.powerCapacity()))
+			if ((SimplePortals.PORTAL_REGISTRY.getPortalPower(portal) < Settings.powerCapacity()))
 			{
-				int surplus = SimplePortals.portalRegistry.addPower(portal, itemStack.getCount());
+				int surplus = SimplePortals.PORTAL_REGISTRY.addPower(portal, itemStack.getCount());
 
-				SimplePortals.portalRegistry.updatePowerGauges((ServerLevel)world, portal);
+				SimplePortals.PORTAL_REGISTRY.updatePowerGauges((ServerLevel)world, portal);
 
 				if (surplus > 0)
 				{

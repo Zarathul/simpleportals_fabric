@@ -11,17 +11,17 @@ public final class Settings
 {
 	private static TagKey<Item> powerSourceTag;
 
-	public static final Identifier MAX_SIZE = SimplePortals.id("max_size");
-	public static final Identifier POWER_COST = SimplePortals.id("power_cost");
-	public static final Identifier POWER_CAPACITY = SimplePortals.id("power_capacity");
-	public static final Identifier PLAYER_TELEPORTATION_DELAY = SimplePortals.id("player_teleportation_delay");
-	public static final Identifier POWER_SOURCE = SimplePortals.id("power_source");
-	public static final Identifier TELEPORTATION_SOUND_ENABLED = SimplePortals.id("teleportation_sound_enabled");
-	public static final Identifier PORTAL_ACTIVATION_SOUND_ENABLED = SimplePortals.id("portal_activation_sound_enabled");
-	public static final Identifier NOT_ENOUGH_POWER_SOUND_ENABLED = SimplePortals.id("not_enough_power_sound_enabled");
-	public static final Identifier PARTICLES_ENABLED = SimplePortals.id("particles_enabled");
-	public static final Identifier AMBIENT_SOUND_ENABLED = SimplePortals.id("ambient_sound_enabled");
-	public static final Identifier TRANSITION_EFFECT_ENABLED = SimplePortals.id("transition_effect_enabled");
+	public static final Identifier MAX_SIZE = SimplePortals.modId("max_size");
+	public static final Identifier POWER_COST = SimplePortals.modId("power_cost");
+	public static final Identifier POWER_CAPACITY = SimplePortals.modId("power_capacity");
+	public static final Identifier PLAYER_TELEPORTATION_DELAY = SimplePortals.modId("player_teleportation_delay");
+	public static final Identifier POWER_SOURCE = SimplePortals.modId("power_source");
+	public static final Identifier TELEPORTATION_SOUND_ENABLED = SimplePortals.modId("teleportation_sound_enabled");
+	public static final Identifier PORTAL_ACTIVATION_SOUND_ENABLED = SimplePortals.modId("portal_activation_sound_enabled");
+	public static final Identifier NOT_ENOUGH_POWER_SOUND_ENABLED = SimplePortals.modId("not_enough_power_sound_enabled");
+	public static final Identifier PARTICLES_ENABLED = SimplePortals.modId("particles_enabled");
+	public static final Identifier AMBIENT_SOUND_ENABLED = SimplePortals.modId("ambient_sound_enabled");
+	public static final Identifier TRANSITION_EFFECT_ENABLED = SimplePortals.modId("transition_effect_enabled");
 
 	public static TagKey<Item> powerSourceTag() { return powerSourceTag; }
 	public static int maxSize() { return (int) Config.getSetting(MAX_SIZE).value; }

@@ -9,9 +9,9 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
+import net.zarathul.simplemodslib.Utils;
 import net.zarathul.simpleportals.blocks.BlockPortal;
 import net.zarathul.simpleportals.blocks.BlockPortalFrame;
-import net.zarathul.simplemodslib.Utils;
 
 import java.util.ArrayList;
 import java.util.List;

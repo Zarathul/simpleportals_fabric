@@ -4,13 +4,12 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
-import net.zarathul.simpleportals.SimplePortals;
+import net.minecraft.world.level.block.Block;
 import net.zarathul.simplemodslib.Utils;
+import net.zarathul.simpleportals.SimplePortals;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
@@ -20,12 +19,15 @@ import java.util.List;
  */
 public class ItemPortalFrame extends BlockItem
 {
-	private static final String toolTipKey = "item." + SimplePortals.MOD_ID + "." + SimplePortals.ITEM_PORTAL_FRAME_NAME + ".tooltip";
-	private static final String toolTipDetailsKey = "item." + SimplePortals.MOD_ID + "." + SimplePortals.ITEM_PORTAL_FRAME_NAME + ".tooltip_details";
+	private static final String TOOLTIP_KEY         = "item." + SimplePortals.MOD_ID + "." + ModItems.FRAME_NAME + ".tooltip";
+	private static final String TOOLTIP_DETAILS_KEY = "item." + SimplePortals.MOD_ID + "." + ModItems.FRAME_NAME + ".tooltip_details";
 
-	public ItemPortalFrame(ResourceKey<Item> id)
+	public ItemPortalFrame(Block block, Properties properties)
 	{
-		super(SimplePortals.blockPortalFrame, new Item.Properties().setId(id).stacksTo(64).useBlockDescriptionPrefix());
+		super(block, properties
+			.stacksTo(64)
+			.useBlockDescriptionPrefix()
+		);
 	}
 
 	@Environment(EnvType.CLIENT)
@@ -37,11 +39,11 @@ public class ItemPortalFrame extends BlockItem
 
 		if (leftShiftState == GLFW.GLFW_PRESS || rightShiftState == GLFW.GLFW_PRESS)
 		{
-			lines.addAll(Utils.multiLineTranslate(toolTipDetailsKey));
+			lines.addAll(Utils.multiLineTranslate(TOOLTIP_DETAILS_KEY));
 		}
 		else
 		{
-			lines.add(Component.translatable(toolTipKey));
+			lines.add(Component.translatable(TOOLTIP_KEY));
 		}
 	}
 }

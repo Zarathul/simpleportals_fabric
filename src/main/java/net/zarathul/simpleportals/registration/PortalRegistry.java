@@ -18,10 +18,11 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
+import net.zarathul.simplemodslib.Utils;
 import net.zarathul.simpleportals.Settings;
 import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.blocks.BlockPortal;
-import net.zarathul.simplemodslib.Utils;
+import net.zarathul.simpleportals.blocks.ModBlocks;
 
 import java.util.*;
 
@@ -64,9 +65,7 @@ public final class PortalRegistry extends SavedData
 	{
 		List<PortalRecord> records = new ArrayList<>(portals.values().size());
 
-		portals.values().stream().distinct().forEach(portal -> {
-			records.add(new PortalRecord(portal, gauges.get(portal), power.get(portal)));
-		});
+		portals.values().stream().distinct().forEach(portal -> records.add(new PortalRecord(portal, gauges.get(portal), power.get(portal))));
 
 		return records;
 	}
@@ -210,7 +209,7 @@ public final class PortalRegistry extends SavedData
 		
 		for (BlockPos portalPos : portalPositions)
 		{
-			world.setBlock(portalPos, SimplePortals.blockPortal.defaultBlockState().setValue(BlockPortal.AXIS, portalAxis), Block.UPDATE_ALL);
+			world.setBlock(portalPos, ModBlocks.PORTAL.defaultBlockState().setValue(BlockPortal.AXIS, portalAxis), Block.UPDATE_ALL);
 		}
 		
 		// Find power gauges in the frame
@@ -219,7 +218,7 @@ public final class PortalRegistry extends SavedData
 		
 		for (BlockPos framePos : portal.getFramePositions(false))
 		{
-			if (world.getBlockState(framePos).getBlock() == SimplePortals.blockPowerGauge)
+			if (world.getBlockState(framePos).getBlock() == ModBlocks.POWER_GAUGE)
 			{
 				powerGauges.add(framePos);
 			}
@@ -466,7 +465,7 @@ public final class PortalRegistry extends SavedData
 		
 		for (BlockPos pos : gaugePositions)
 		{
-			world.updateNeighbourForOutputSignal(pos, SimplePortals.blockPowerGauge);
+			world.updateNeighbourForOutputSignal(pos, ModBlocks.POWER_GAUGE);
 		}
 	}
 
@@ -864,7 +863,7 @@ public final class PortalRegistry extends SavedData
 		
 		Block block = world.getBlockState(pos).getBlock();
 
-		return (block == SimplePortals.blockPortalFrame || block == SimplePortals.blockPowerGauge);
+		return (block == ModBlocks.FRAME || block == ModBlocks.POWER_GAUGE);
 	}
 	
 	/**
@@ -897,5 +896,5 @@ public final class PortalRegistry extends SavedData
 			).apply(instance, PortalRegistry::new)
 	);
 
-	public static final SavedDataType<PortalRegistry> TYPE = new SavedDataType<>(SimplePortals.id("portal_registry"), PortalRegistry::new, CODEC, null	);
+	public static final SavedDataType<PortalRegistry> TYPE = new SavedDataType<>(SimplePortals.modId("portal_registry"), PortalRegistry::new, CODEC, null);
 }

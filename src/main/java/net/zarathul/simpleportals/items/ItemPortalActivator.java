@@ -10,16 +10,15 @@ import net.minecraft.core.Direction.AxisDirection;
 import net.minecraft.core.dispenser.BlockSource;
 import net.minecraft.core.dispenser.DefaultDispenseItemBehavior;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.block.DispenserBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.zarathul.simplemodslib.Utils;
 import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.blocks.BlockPortalFrame;
-import net.zarathul.simplemodslib.Utils;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -30,12 +29,12 @@ import java.util.List;
  */
 public class ItemPortalActivator extends Item
 {
-	private static final String toolTipKey = "item." + SimplePortals.MOD_ID + "." + SimplePortals.ITEM_PORTAL_ACTIVATOR_NAME + ".tooltip";
-	private static final String toolTipDetailsKey = "item." + SimplePortals.MOD_ID + "." + SimplePortals.ITEM_PORTAL_ACTIVATOR_NAME + ".tooltip_details";
+	private static final String TOOLTIP_KEY         = "item." + SimplePortals.MOD_ID + "." + ModItems.PORTAL_ACTIVATOR_NAME + ".tooltip";
+	private static final String TOOLTIP_DETAILS_KEY = "item." + SimplePortals.MOD_ID + "." + ModItems.PORTAL_ACTIVATOR_NAME + ".tooltip_details";
 	
-	public ItemPortalActivator(ResourceKey<Item> id)
+	public ItemPortalActivator(Properties properties)
 	{
-		super(new Item.Properties().setId(id).stacksTo(1));
+		super(properties.stacksTo(1));
 
 		// Custom dispenser behavior that allows dispensers to activate portals with a contained
 		// portal activator.
@@ -78,7 +77,7 @@ public class ItemPortalActivator extends Item
 
 						if (world.getBlockState(currentPos).getBlock() instanceof BlockPortalFrame)
 						{
-							if (SimplePortals.portalRegistry.activatePortal(world, currentPos, facing.getOpposite()))
+							if (SimplePortals.PORTAL_REGISTRY.activatePortal(world, currentPos, facing.getOpposite()))
 							{
 								return stack;
 							}
@@ -100,11 +99,11 @@ public class ItemPortalActivator extends Item
 
 		if (leftShiftState == GLFW.GLFW_PRESS || rightShiftState == GLFW.GLFW_PRESS)
 		{
-			lines.addAll(Utils.multiLineTranslate(toolTipDetailsKey, 1));
+			lines.addAll(Utils.multiLineTranslate(TOOLTIP_DETAILS_KEY, 1));
 		}
 		else
 		{
-			lines.add(Component.translatable(toolTipKey));
+			lines.add(Component.translatable(TOOLTIP_KEY));
 		}
 	}
 }
