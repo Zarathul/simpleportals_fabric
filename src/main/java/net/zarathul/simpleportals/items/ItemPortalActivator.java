@@ -19,7 +19,7 @@ import net.minecraft.world.level.block.DispenserBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.blocks.BlockPortalFrame;
-import net.zarathul.simpleportals.common.Utils;
+import net.zarathul.simplemodslib.Utils;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -100,7 +100,7 @@ public class ItemPortalActivator extends Item
 
 		if (leftShiftState == GLFW.GLFW_PRESS || rightShiftState == GLFW.GLFW_PRESS)
 		{
-			lines.addAll(Utils.multiLineTranslatable(toolTipDetailsKey, 1));
+			lines.addAll(Utils.multiLineTranslate(toolTipDetailsKey, 1));
 		}
 		else
 		{

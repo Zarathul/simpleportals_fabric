@@ -13,7 +13,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.Permissions;
-import net.zarathul.simpleportals.common.Utils;
+import net.zarathul.simplemodslib.Utils;
 
 import java.util.Set;
 

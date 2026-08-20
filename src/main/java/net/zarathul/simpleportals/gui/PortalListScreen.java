@@ -21,7 +21,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.zarathul.simplemodslib.api.gui.CycleButtonEx;
 import net.zarathul.simpleportals.SimplePortals;
-import net.zarathul.simpleportals.common.Utils;
+import net.zarathul.simplemodslib.Utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -387,7 +387,7 @@ public class PortalListScreen extends Screen
 				powerBox.setValue(Integer.toString(portal.power()));
 				powerBox.moveCursorToStart(false);
 
-				setPowerButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(Utils.createModIdentifier("set_power_button"), Utils.createModIdentifier("set_power_button_highlighted")), button -> {
+				setPowerButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(SimplePortals.id("set_power_button"), SimplePortals.id("set_power_button_highlighted")), button -> {
 					try
 					{
 						int power = Integer.parseInt(powerBox.getValue());
@@ -396,12 +396,12 @@ public class PortalListScreen extends Screen
 					catch (NumberFormatException _) {}
 				});
 
-				gotoLocationButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(Utils.createModIdentifier("teleport"), Utils.createModIdentifier("teleport_highlighted")), button -> {
+				gotoLocationButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(SimplePortals.id("teleport"), SimplePortals.id("teleport_highlighted")), button -> {
 					minecraft.gui.setScreen(null);
 					ClientPlayNetworking.send(new SimplePortals.TpdCommandPayload(portal.dimension().identifier(), portal.location()));
 				});
 
-				deactivateButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(Utils.createModIdentifier("deactivate_button"), Utils.createModIdentifier("deactivate_button_highlighted")), button -> {
+				deactivateButton = new ImageButton(0, 0, IMAGE_BUTTON_SIZE, IMAGE_BUTTON_SIZE, new WidgetSprites(SimplePortals.id("deactivate_button"), SimplePortals.id("deactivate_button_highlighted")), button -> {
 					ClientPlayNetworking.send(new SimplePortals.DeactivatePortalPayload(portal.dimension().identifier(), portal.location(), new PortalListSettings(sorting, filter)));
 				});
 

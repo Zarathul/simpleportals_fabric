@@ -10,7 +10,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.zarathul.simpleportals.SimplePortals;
-import net.zarathul.simpleportals.common.Utils;
+import net.zarathul.simplemodslib.Utils;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
@@ -37,7 +37,7 @@ public class ItemPowerGauge extends BlockItem
 
 		if (leftShiftState == GLFW.GLFW_PRESS || rightShiftState == GLFW.GLFW_PRESS)
 		{
-			lines.addAll(Utils.multiLineTranslatable(toolTipDetailsKey));
+			lines.addAll(Utils.multiLineTranslate(toolTipDetailsKey));
 		}
 		else
 		{

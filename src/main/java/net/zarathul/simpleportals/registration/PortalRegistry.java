@@ -21,7 +21,7 @@ import net.minecraft.world.level.saveddata.SavedDataType;
 import net.zarathul.simpleportals.Settings;
 import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.blocks.BlockPortal;
-import net.zarathul.simpleportals.common.Utils;
+import net.zarathul.simplemodslib.Utils;
 
 import java.util.*;
 
@@ -210,7 +210,7 @@ public final class PortalRegistry extends SavedData
 		
 		for (BlockPos portalPos : portalPositions)
 		{
-			world.setBlock(portalPos, SimplePortals.blockPortal.defaultBlockState().setValue(BlockPortal.AXIS, portalAxis), Utils.SetBlockFlags.FULL_UPDATE);
+			world.setBlock(portalPos, SimplePortals.blockPortal.defaultBlockState().setValue(BlockPortal.AXIS, portalAxis), Block.UPDATE_ALL);
 		}
 		
 		// Find power gauges in the frame
@@ -897,5 +897,5 @@ public final class PortalRegistry extends SavedData
 			).apply(instance, PortalRegistry::new)
 	);
 
-	public static final SavedDataType<PortalRegistry> TYPE = new SavedDataType<>(Utils.createModIdentifier("portal_registry"), PortalRegistry::new, CODEC, null	);
+	public static final SavedDataType<PortalRegistry> TYPE = new SavedDataType<>(SimplePortals.id("portal_registry"), PortalRegistry::new, CODEC, null	);
 }

@@ -21,7 +21,7 @@ import net.zarathul.simplemodslib.api.configuration.Config;
 import net.zarathul.simpleportals.Settings;
 import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.commands.arguments.BlockArgument;
-import net.zarathul.simpleportals.common.Utils;
+import net.zarathul.simplemodslib.Utils;
 import net.zarathul.simpleportals.mixin.EntityAccessor;
 import net.zarathul.simpleportals.registration.Address;
 import net.zarathul.simpleportals.registration.Portal;
@@ -291,7 +291,7 @@ public class CommandPortals
 				}
 
 				portals = portalRegistry.getPortalsAt(pos, dimension);
-				if (portals == null || portals.isEmpty()) throw new SimpleCommandExceptionType(Utils.translate("commands.errors.portal_not_found_at_pos_in_dimension", pos.getX(), pos.getY(), pos.getZ(), dimension.identifier())).create();
+				if (portals == null || portals.isEmpty()) throw new SimpleCommandExceptionType(Utils.getTranslatedComponent("commands.errors.portal_not_found_at_pos_in_dimension", pos.getX(), pos.getY(), pos.getZ(), dimension.identifier())).create();
 
 				break;
 		}
@@ -303,7 +303,7 @@ public class CommandPortals
 		{
 			portalPos = portal.corner1().pos();
 			dimensionServer = source.getServer().getLevel(portal.dimension());
-			if (dimensionServer == null) throw new SimpleCommandExceptionType(Utils.translate("commands.errors.missing_dimension", portal.dimension().identifier())).create();
+			if (dimensionServer == null) throw new SimpleCommandExceptionType(Utils.getTranslatedComponent("commands.errors.missing_dimension", portal.dimension().identifier())).create();
 
 			portalRegistry.deactivatePortal(dimensionServer, portalPos);
 			Utils.SendTranslatedMessage(source, "commands.sportals.deactivate.success", portalPos.getX(), portalPos.getY(), portalPos.getZ(), portal.dimension().identifier().toString());
@@ -338,11 +338,11 @@ public class CommandPortals
 
 		if (portals == null || portals.isEmpty())
 		{
-			throw new SimpleCommandExceptionType(Utils.translate("commands.errors.portal_not_found_at_pos_in_dimension", pos.getX(), pos.getY(), pos.getZ(), dimension.identifier())).create();
+			throw new SimpleCommandExceptionType(Utils.getTranslatedComponent("commands.errors.portal_not_found_at_pos_in_dimension", pos.getX(), pos.getY(), pos.getZ(), dimension.identifier())).create();
 		}
 		else if (portals.size() > 1)
 		{
-			throw new SimpleCommandExceptionType(Utils.translate("commands.errors.multiple_portals_found_at_pos_in_dimension", pos.getX(), pos.getY(), pos.getZ(), dimension.identifier())).create();
+			throw new SimpleCommandExceptionType(Utils.getTranslatedComponent("commands.errors.multiple_portals_found_at_pos_in_dimension", pos.getX(), pos.getY(), pos.getZ(), dimension.identifier())).create();
 		}
 
 		Portal portal = portals.getFirst();

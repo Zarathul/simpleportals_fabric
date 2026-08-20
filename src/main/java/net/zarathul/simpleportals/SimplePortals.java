@@ -38,7 +38,6 @@ import net.zarathul.simpleportals.blocks.BlockPowerGauge;
 import net.zarathul.simpleportals.commands.CommandPortals;
 import net.zarathul.simpleportals.commands.CommandTeleport;
 import net.zarathul.simpleportals.commands.arguments.BlockArgument;
-import net.zarathul.simpleportals.common.Utils;
 import net.zarathul.simpleportals.gui.PortalInfo;
 import net.zarathul.simpleportals.gui.PortalListSettings;
 import net.zarathul.simpleportals.items.ItemPortalActivator;
@@ -84,6 +83,10 @@ public class SimplePortals implements ModInitializer
 	// portal registry
 	public static PortalRegistry portalRegistry;
 
+	public static Identifier id(String path) {
+		return Identifier.fromNamespaceAndPath(MOD_ID, path);
+	}
+
 	@Override
 	public void onInitialize()
 	{
@@ -91,15 +94,15 @@ public class SimplePortals implements ModInitializer
 		ArgumentTypeRegistry.registerArgumentType(Identifier.fromNamespaceAndPath(MOD_ID, "block_argument"), BlockArgument.class, SingletonArgumentInfo.contextFree(BlockArgument::block));
 
 		// Register Blocks & Items.
-		Registry.register(BuiltInRegistries.BLOCK, Utils.createModIdentifier(BLOCK_PORTAL_NAME), blockPortal);
+		Registry.register(BuiltInRegistries.BLOCK, id(BLOCK_PORTAL_NAME), blockPortal);
 
-		Registry.register(BuiltInRegistries.ITEM, Utils.createModIdentifier(ITEM_PORTAL_FRAME_NAME), itemPortalFrame);
-		Registry.register(BuiltInRegistries.BLOCK, Utils.createModIdentifier(BLOCK_PORTAL_FRAME_NAME), blockPortalFrame);
+		Registry.register(BuiltInRegistries.ITEM, id(ITEM_PORTAL_FRAME_NAME), itemPortalFrame);
+		Registry.register(BuiltInRegistries.BLOCK, id(BLOCK_PORTAL_FRAME_NAME), blockPortalFrame);
 
-		Registry.register(BuiltInRegistries.ITEM, Utils.createModIdentifier(ITEM_POWER_GAUGE_NAME), itemPowerGauge);
-		Registry.register(BuiltInRegistries.BLOCK, Utils.createModIdentifier(BLOCK_POWER_GAUGE_NAME), blockPowerGauge);
+		Registry.register(BuiltInRegistries.ITEM, SimplePortals.id(ITEM_POWER_GAUGE_NAME), itemPowerGauge);
+		Registry.register(BuiltInRegistries.BLOCK, id(BLOCK_POWER_GAUGE_NAME), blockPowerGauge);
 
-		Registry.register(BuiltInRegistries.ITEM, Utils.createModIdentifier(ITEM_PORTAL_ACTIVATOR_NAME), itemPortalActivator);
+		Registry.register(BuiltInRegistries.ITEM, id(ITEM_PORTAL_ACTIVATOR_NAME), itemPortalActivator);
 
 		SimpleModsLib.creativeModeTabItems.add(itemPortalFrame);
 		SimpleModsLib.creativeModeTabItems.add(itemPowerGauge);
@@ -287,19 +290,19 @@ public class SimplePortals implements ModInitializer
 
 	private static ResourceKey<Block> createBlockKey(String name)
 	{
-		return ResourceKey.create(Registries.BLOCK, Utils.createModIdentifier(name));
+		return ResourceKey.create(Registries.BLOCK, id(name));
 	}
 
 	private static ResourceKey<Item> createItemKey(String name)
 	{
-		return ResourceKey.create(Registries.ITEM, Utils.createModIdentifier(name));
+		return ResourceKey.create(Registries.ITEM, id(name));
 	}
 
 	// Custom packets
 
 	public record ListCommandPayload(List<PortalInfo> portals, PortalListSettings portalListSettings) implements CustomPacketPayload
 	{
-		public static final Identifier ID = Utils.createModIdentifier("list_command");
+		public static final Identifier ID = id("list_command");
 		public static final CustomPacketPayload.Type<ListCommandPayload> TYPE = new CustomPacketPayload.Type<>(ID);
 		public static final StreamCodec<FriendlyByteBuf, ListCommandPayload> STREAM_CODEC = StreamCodec.composite(
 			PortalInfo.LIST_STREAM_CODEC, ListCommandPayload::portals,
@@ -339,7 +342,7 @@ public class SimplePortals implements ModInitializer
 
 	public record SetPortalPowerPayload(Identifier dimension, BlockPos location, int value, PortalListSettings portalListSettings) implements CustomPacketPayload
 	{
-		public static final Identifier ID = Utils.createModIdentifier("set_portal_power");
+		public static final Identifier ID = id("set_portal_power");
 		public static final CustomPacketPayload.Type<SetPortalPowerPayload> TYPE = new CustomPacketPayload.Type<>(ID);
 
 		public static final StreamCodec<FriendlyByteBuf, SetPortalPowerPayload> STREAM_CODEC = StreamCodec.composite(
@@ -355,7 +358,7 @@ public class SimplePortals implements ModInitializer
 
 	public record DeactivatePortalPayload(Identifier dimension, BlockPos location, PortalListSettings portalListSettings) implements CustomPacketPayload
 	{
-		public static final Identifier ID = Utils.createModIdentifier("deactivate_portal");
+		public static final Identifier ID = id("deactivate_portal");
 		public static final CustomPacketPayload.Type<DeactivatePortalPayload> TYPE = new CustomPacketPayload.Type<>(ID);
 
 		public static final StreamCodec<FriendlyByteBuf, DeactivatePortalPayload> STREAM_CODEC = StreamCodec.composite(
@@ -370,7 +373,7 @@ public class SimplePortals implements ModInitializer
 
 	public record TpdCommandPayload(Identifier dimension, BlockPos location) implements CustomPacketPayload
 	{
-		public static final Identifier ID = Utils.createModIdentifier("tpd_command");
+		public static final Identifier ID = id("tpd_command");
 		public static final CustomPacketPayload.Type<TpdCommandPayload> TYPE = new CustomPacketPayload.Type<>(ID);
 		public static final StreamCodec<FriendlyByteBuf, TpdCommandPayload> STREAM_CODEC = StreamCodec.composite(
 				Identifier.STREAM_CODEC, TpdCommandPayload::dimension,
