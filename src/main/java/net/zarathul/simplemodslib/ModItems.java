@@ -4,10 +4,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.BucketItem;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.PotionItem;
+import net.minecraft.world.item.*;
 import net.minecraft.world.item.alchemy.Potions;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
@@ -20,7 +17,7 @@ import net.zarathul.simplemodslib.mixin.ItemAccessor;
 public final class ModItems
 {
 	private static final ItemRegistrar REGISTRAR = new ItemRegistrar(SimpleModsLib.MOD_ID);
-	public static final LogoItem LOGO = REGISTRAR.register("logo", ModBlocks.LOGO, LogoItem::new);
+	public static final BlockItem LOGO = REGISTRAR.register("logo", ModBlocks.LOGO, BlockItem::new);
 
 	public static void init()
 	{

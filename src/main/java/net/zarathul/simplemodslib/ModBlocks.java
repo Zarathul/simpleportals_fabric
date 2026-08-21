@@ -5,6 +5,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.zarathul.simplemodslib.api.block.BlockRegistrar;
@@ -14,7 +15,7 @@ import net.zarathul.simplemodslib.api.fluid.IFluidContainerItem;
 public final class ModBlocks
 {
 	private static final BlockRegistrar REGISTRAR = new BlockRegistrar(SimpleModsLib.MOD_ID);
-	public static final LogoBlock LOGO = REGISTRAR.register("logo", LogoBlock::new);
+	public static final Block LOGO = REGISTRAR.register("logo", Block::new, Block.Properties.of().instabreak().noOcclusion());
 
 	public static void init()
 	{
