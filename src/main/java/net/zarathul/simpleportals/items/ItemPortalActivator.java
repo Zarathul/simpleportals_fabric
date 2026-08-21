@@ -1,25 +1,18 @@
 package net.zarathul.simpleportals.items;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
 import net.minecraft.core.Direction.AxisDirection;
 import net.minecraft.core.dispenser.BlockSource;
 import net.minecraft.core.dispenser.DefaultDispenseItemBehavior;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.block.DispenserBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import net.zarathul.simplemodslib.Utils;
 import net.zarathul.simpleportals.SimplePortals;
 import net.zarathul.simpleportals.blocks.BlockPortalFrame;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,9 +22,6 @@ import java.util.List;
  */
 public class ItemPortalActivator extends Item
 {
-	private static final String TOOLTIP_KEY         = "item." + SimplePortals.MOD_ID + "." + ModItems.PORTAL_ACTIVATOR_NAME + ".tooltip";
-	private static final String TOOLTIP_DETAILS_KEY = "item." + SimplePortals.MOD_ID + "." + ModItems.PORTAL_ACTIVATOR_NAME + ".tooltip_details";
-	
 	public ItemPortalActivator(Properties properties)
 	{
 		super(properties.stacksTo(1));
@@ -88,22 +78,5 @@ public class ItemPortalActivator extends Item
 				return ejectBehavior.dispense(source, stack);
 			}
 		});
-	}
-
-	@Environment(EnvType.CLIENT)
-	public void addTooltip(ItemStack stack, TooltipContext tooltipContext, TooltipFlag tooltipFlag, List<Component> lines)
-	{
-		long windowHandle = Minecraft.getInstance().getWindow().handle();
-		int leftShiftState = GLFW.glfwGetKey(windowHandle, GLFW.GLFW_KEY_LEFT_SHIFT);
-		int rightShiftState = GLFW.glfwGetKey(windowHandle, GLFW.GLFW_KEY_RIGHT_SHIFT);
-
-		if (leftShiftState == GLFW.GLFW_PRESS || rightShiftState == GLFW.GLFW_PRESS)
-		{
-			lines.addAll(Utils.multiLineTranslate(TOOLTIP_DETAILS_KEY, 1));
-		}
-		else
-		{
-			lines.add(Component.translatable(TOOLTIP_KEY));
-		}
 	}
 }
