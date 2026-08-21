@@ -1,11 +1,15 @@
 package net.zarathul.simplemodslib;
 
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
+import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FormattedText;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 
@@ -63,7 +67,8 @@ public final class Utils
 	}
 
 	/**
-	 * Gets the localized formatted components for the specified key and formatting arguments.
+	 * Gets the localized formatted components for the specified key and formatting arguments, split at new lines ('\n')
+	 * in the localized text.
 	 *
 	 * @param key
 	 * The localization key.
@@ -82,6 +87,47 @@ public final class Utils
 		for (String line : lines)
 		{
 			components.add(Component.literal(line));
+		}
+
+		return components;
+	}
+
+	/**
+	 * Gets the localized formatted components for the specified key and formatting arguments, split at new lines ('\n')
+	 * in the localized text and the resulting segments at {@code maxWidth}.<br>
+	 * Note: {@link net.minecraft.client.gui.Font#splitIgnoringLanguage(FormattedText, int)} is used to split at {@code maxWidth}
+	 * which, as the name suggests, will probably not work with all languages. Styles are also not preserved at the site of the split.
+	 * A workaround is to style words individually, e.g. instead of {@code §3Foo Bar§r} use {@code §3Foo §3Bar§r}.
+	 * Unfortunately, {@link net.minecraft.client.gui.Font#split(FormattedText, int)}
+	 * produces a list of FormattedCharSequences, which are meant for rendering and have equally broken styling.
+	 *
+	 * @param key
+	 * The localization key.
+	 * @param maxWidth
+	 * The maximum width at which to split the segment.
+	 * @param args
+	 * Formatting arguments.
+	 * @return
+	 * A list of localized text components for the specified key, or an empty list if the key was not found.
+	 */
+	@Environment(EnvType.CLIENT)
+	public static ArrayList<Component> multiLineTranslateWithMaxWidth(String key, int maxWidth, Object... args)
+	{
+		var mc = Minecraft.getInstance();
+
+		ArrayList<Component> components = new ArrayList<>();
+		String text = translate(key, args);
+		String[] fixedSegments = text.split("\\n");
+
+		for (var segment : fixedSegments)
+		{
+			FormattedText formattedText = FormattedText.of(segment);
+			List<FormattedText> lines = mc.font.splitIgnoringLanguage(formattedText, maxWidth);
+
+			for (var line : lines)
+			{
+				components.add(Component.literal(line.getString()));
+			}
 		}
 
 		return components;
