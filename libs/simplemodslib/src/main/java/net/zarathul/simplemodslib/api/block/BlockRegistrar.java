@@ -16,10 +16,15 @@ public record BlockRegistrar(String modId)
 {
 	public <T extends Block> T register(String name, Function<Block.Properties, Block> factory)
 	{
+		return register(name, factory, Block.Properties.of());
+	}
+
+	public <T extends Block> T register(String name, Function<Block.Properties, Block> factory, Block.Properties properties)
+	{
 		Identifier id = Identifier.fromNamespaceAndPath(modId, name);
 		ResourceKey<Block> key = ResourceKey.create(Registries.BLOCK, id);
 
-		return (T) Registry.register(BuiltInRegistries.BLOCK, id, factory.apply(Block.Properties.of().setId(key)));
+		return (T) Registry.register(BuiltInRegistries.BLOCK, id, factory.apply(properties.setId(key)));
 	}
 
 	public <T extends BlockEntity> BlockEntityType<T> register(String name, BlockEntityType.BlockEntitySupplier<T> factory, Block... blocks)

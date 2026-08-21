@@ -16,17 +16,27 @@ public record ItemRegistrar(String modId)
 {
 	public <T extends Item> T register(String name, Function<Item.Properties, Item> factory)
 	{
-		Identifier id = Identifier.fromNamespaceAndPath(modId, name);
-		ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, id);
-
-		return (T)Registry.register(BuiltInRegistries.ITEM, id, factory.apply(new Item.Properties().setId(key)));
+		return register(name, factory, new Item.Properties());
 	}
 
-	public <T extends BlockItem> T register(String name, Block block, BiFunction<Block, Item.Properties, BlockItem> factory)
+	public <T extends Item> T register(String name, Function<Item.Properties, Item> factory, Item.Properties properties)
 	{
 		Identifier id = Identifier.fromNamespaceAndPath(modId, name);
 		ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, id);
 
-		return (T)Registry.register(BuiltInRegistries.ITEM, id, factory.apply(block, new Item.Properties().setId(key)));
+		return (T)Registry.register(BuiltInRegistries.ITEM, id, factory.apply(properties.setId(key)));
+	}
+
+	public <T extends BlockItem> T register(String name, Block block, BiFunction<Block, Item.Properties, BlockItem> factory)
+	{
+		return register(name, block, factory, new Item.Properties());
+	}
+
+	public <T extends BlockItem> T register(String name, Block block, BiFunction<Block, Item.Properties, BlockItem> factory, Item.Properties properties)
+	{
+		Identifier id = Identifier.fromNamespaceAndPath(modId, name);
+		ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, id);
+
+		return (T)Registry.register(BuiltInRegistries.ITEM, id, factory.apply(block, properties.setId(key)));
 	}
 }
