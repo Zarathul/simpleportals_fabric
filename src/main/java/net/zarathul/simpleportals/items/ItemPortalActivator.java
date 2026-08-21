@@ -24,7 +24,7 @@ public class ItemPortalActivator extends Item
 {
 	public ItemPortalActivator(Properties properties)
 	{
-		super(properties.stacksTo(1));
+		super(properties);
 
 		// Custom dispenser behavior that allows dispensers to activate portals with a contained
 		// portal activator.

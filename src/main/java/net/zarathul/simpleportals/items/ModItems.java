@@ -1,5 +1,7 @@
 package net.zarathul.simpleportals.items;
 
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Item;
 import net.zarathul.simplemodslib.SimpleModsLib;
 import net.zarathul.simplemodslib.api.item.ItemRegistrar;
 import net.zarathul.simpleportals.SimplePortals;
@@ -15,9 +17,9 @@ public final class ModItems
 	public static final String POWER_GAUGE_NAME = "power_gauge";
 	public static final String PORTAL_ACTIVATOR_NAME = "portal_activator";
 
-	public static final ItemPortalFrame FRAME = REGISTRAR.register(FRAME_NAME, ModBlocks.FRAME, ItemPortalFrame::new);
-	public static final ItemPowerGauge POWER_GAUGE = REGISTRAR.register(POWER_GAUGE_NAME, ModBlocks.POWER_GAUGE, ItemPowerGauge::new);
-	public static final ItemPortalActivator PORTAL_ACTIVATOR = REGISTRAR.register(PORTAL_ACTIVATOR_NAME, ItemPortalActivator::new);
+	public static final BlockItem FRAME = REGISTRAR.register(FRAME_NAME, ModBlocks.FRAME, BlockItem::new, new Item.Properties().stacksTo(64));
+	public static final BlockItem POWER_GAUGE = REGISTRAR.register(POWER_GAUGE_NAME, ModBlocks.POWER_GAUGE, BlockItem::new, new Item.Properties().stacksTo(64));
+	public static final ItemPortalActivator PORTAL_ACTIVATOR = REGISTRAR.register(PORTAL_ACTIVATOR_NAME, ItemPortalActivator::new, new Item.Properties().stacksTo(1));
 
 	public static void init()
 	{
