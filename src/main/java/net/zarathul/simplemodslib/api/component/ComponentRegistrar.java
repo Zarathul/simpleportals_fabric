@@ -23,4 +23,11 @@ public record ComponentRegistrar(String modId)
 
 		return Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id, DataComponentType.<T>builder().networkSynchronized(codec).build());
 	}
+
+	public <T> DataComponentType<T> register(String name, Codec<T> codec, StreamCodec<? super RegistryFriendlyByteBuf, T> streamCodec)
+	{
+		Identifier id = Identifier.fromNamespaceAndPath(modId, name);
+
+		return Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id, DataComponentType.<T>builder().persistent(codec).networkSynchronized(streamCodec).build());
+	}
 }
