@@ -2,5 +2,8 @@
 	"config.gui.input_invalid": "Wert ist ungültig und wird nicht gespeichert!",
 	"config.gui.needs_world_restart": "Änderungen an diesem Wert setzen einen Neustart der Welt vorraus!",
 	"config.gui.reset_to_default": "Drücken um auf Standartwert zurückzusetzen.",
-	"config.gui.save": "Speichern"
+	"config.gui.save": "Speichern",
+	"item.simplemodslib.logo": "LOGO",
+	"item.simplemodslib.logo.tooltip": "§7(§e§oShift §7für Details gedrückt halten)",
+	"item.simplemodslib.logo.tooltip_details": "Das darfst du §bNICHT§r haben!"
 }

@@ -9,6 +9,7 @@ public class SimpleModsLibClient implements ClientModInitializer
 	@Override
 	public void onInitializeClient()
 	{
+		ModItems.registerTooltips();
 		ItemTintSources.ID_MAPPER.put(SimpleModsLib.modId(ContainerItemFluidTintSource.NAME), ContainerItemFluidTintSource.MAP_CODEC);
 	}
 }

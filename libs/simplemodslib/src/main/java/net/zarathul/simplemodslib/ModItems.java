@@ -23,6 +23,7 @@ public final class ModItems
 	{
 		SimpleModsLib.LOG.info("Registering items.");
 	}
+	public static void registerTooltips() { REGISTRAR.registerTooltips(); }
 
 	public static InteractionResult useItemCallback(Player player, Level level, InteractionHand hand)
 	{
